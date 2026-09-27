@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pokédex Collector</title>
+<meta name="description" content="Completa a tua Pokédex em cartas: marca o que tens e descobre as cartas mais valiosas de cada Pokémon.">
+<meta name="theme-color" content="#14161c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pokédex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#f3f4f7; --surface:#ffffff; --surface-2:#eef0f4; --surface-3:#e6e9ef;
+  --ink:#1a1d26; --muted:#6a7280; --faint:#99a0ad; --line:#e3e6ec;
+  --accent:#c8901a; --accent-ink:#8a6206; --accent-soft:#f6ead0;
+  --good:#2e9e5b; --good-soft:#d9f2e2; --info:#2f6feb; --danger:#d64545;
+  --shadow:0 1px 2px rgba(20,22,28,.06),0 6px 18px rgba(20,22,28,.06);
+  color-scheme:light;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+  --bg:#101219; --surface:#191c24; --surface-2:#222633; --surface-3:#2a2f3d;
+  --ink:#eef0f6; --muted:#98a0b2; --faint:#6c7488; --line:#2a2f3d;
+  --accent:#e6b53f; --accent-ink:#f2ce78; --accent-soft:#2e2716;
+  --good:#48c07d; --good-soft:#173322; --info:#5b90ff; --danger:#f0736f;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#101219; --surface:#191c24; --surface-2:#222633; --surface-3:#2a2f3d;
+  --ink:#eef0f6; --muted:#98a0b2; --faint:#6c7488; --line:#2a2f3d;
+  --accent:#e6b53f; --accent-ink:#f2ce78; --accent-soft:#2e2716;
+  --good:#48c07d; --good-soft:#173322; --info:#5b90ff; --danger:#f0736f;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+}
+img{max-width:100%; display:block}
+button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
+input{font:inherit}
+a{color:var(--info); text-decoration:none}
+[hidden]{display:none!important}
+.tnum{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
+
+/* ---------- app bar ---------- */
+.bar{position:sticky; top:env(safe-area-inset-top,0); z-index:30; background:color-mix(in srgb,var(--surface) 88%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid var(--line)}
+.bar-in{max-width:1180px; margin:0 auto; padding:10px 16px 8px}
+.row{display:flex; align-items:center; gap:10px}
+.brand{display:flex; align-items:center; gap:9px; font-family:Sora; font-weight:700; font-size:17px; letter-spacing:-.2px}
+.brand .pk{width:26px;height:26px;border-radius:50%;flex:0 0 auto;
+  background:
+    radial-gradient(circle at 50% 50%, #fff 0 15%, #18181c 15% 22%, transparent 22%),
+    linear-gradient(#ee1c25 0 50%, #f4f5f7 50% 100%);
+  border:2px solid #18181c; box-shadow:inset 0 0 0 2px rgba(0,0,0,.06)}
+.spacer{flex:1}
+.iconbtn{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:var(--muted);background:var(--surface-2)}
+.iconbtn:hover{color:var(--ink)}
+.iconbtn svg{width:20px;height:20px}
+.progress-wrap{margin-top:9px;display:flex;align-items:center;gap:11px}
+.pbar{flex:1;height:9px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.pbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#e8b84e);border-radius:99px;transition:width .5s ease}
+.pcount{font-family:Sora;font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+.pcount b{color:var(--ink)}
+.search{margin-top:9px;position:relative}
+.search input{width:100%;padding:11px 12px 11px 40px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+.search input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--faint)}
+.chips{display:flex;gap:7px;margin-top:9px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:7px 13px;border-radius:99px;background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid transparent}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip.on.gen{background:var(--accent);color:#231a04;border-color:var(--accent)}
+
+/* ---------- grid ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:14px 16px 40px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:11px}
+.tile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:8px 8px 9px;box-shadow:var(--shadow);
+  content-visibility:auto;contain-intrinsic-size:158px;transition:transform .12s ease,border-color .12s}
+.tile:active{transform:scale(.97)}
+.tile.owned{border-color:color-mix(in srgb,var(--good) 55%,var(--line))}
+.tile .imgbox{aspect-ratio:1/1;border-radius:11px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden}
+.tile .imgbox img{width:100%;height:100%;object-fit:contain;padding:4px}
+.tile.card-mode .imgbox img{object-fit:cover;padding:0}
+.tile .num{font-size:11px;color:var(--faint);font-weight:600;margin-top:6px}
+.tile .nm{font-size:12.5px;font-weight:600;line-height:1.2;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .rbadges{position:absolute;top:6px;left:6px;display:flex;gap:3px}
+.rbadge{font-size:9px;font-weight:800;letter-spacing:.3px;padding:2px 5px;border-radius:6px;background:var(--surface-3);color:var(--muted);text-transform:uppercase}
+.rbadge.reg{background:#e9d5ff;color:#6b21a8}
+:root[data-theme="dark"] .rbadge.reg,:root:not([data-theme="light"]) .rbadge.reg{background:#3b2a52;color:#d6b4ff}
+.check{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--faint);z-index:2}
+.check svg{width:16px;height:16px}
+.tile.owned .check{background:var(--good);border-color:var(--good);color:#fff}
+.tile .ownedcard{margin-top:5px;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;min-height:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tile .ownedcard b{color:var(--accent-ink)}
+.tile .nocardtag{margin-top:5px;font-size:10.5px;color:var(--faint);min-height:14px}
+.empty{padding:48px 16px;text-align:center;color:var(--muted)}
+.empty b{color:var(--ink);font-family:Sora}
+
+/* ---------- detail ---------- */
+.detail{max-width:900px;margin:0 auto;padding:0 16px 48px}
+.dtop{display:flex;align-items:center;gap:12px;padding:14px 0 6px}
+.dtop .back{width:40px;height:40px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;color:var(--ink);flex:0 0 auto}
+.dtop .back svg{width:22px;height:22px}
+.dtitle .num{font-size:12px;color:var(--faint);font-weight:700;letter-spacing:.5px}
+.dtitle h1{font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1.1}
+.ftabs{display:flex;gap:7px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
+.ftabs::-webkit-scrollbar{display:none}
+.ftab{white-space:nowrap;padding:8px 14px;border-radius:99px;background:var(--surface-2);color:var(--muted);font-weight:600;font-size:13px;border:1px solid transparent}
+.ftab.on{background:var(--accent);color:#231a04;border-color:var(--accent)}
+.ftab .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--good);margin-left:6px;vertical-align:middle}
+
+.mine{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow);margin-top:6px;display:flex;gap:14px;align-items:center}
+.mine.none{border-style:dashed;color:var(--muted);display:block;text-align:center;padding:20px 16px}
+.mine .cardimg{width:96px;flex:0 0 auto;aspect-ratio:734/1024;border-radius:9px;overflow:hidden;background:var(--surface-2);box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.mine .cardimg img{width:100%;height:100%;object-fit:cover}
+.mine .meta{flex:1;min-width:0}
+.mine .meta .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:700}
+.mine .meta h3{font-size:17px;margin:2px 0 3px;font-family:Sora}
+.mine .meta .set{font-size:13px;color:var(--muted)}
+.mine .price{font-family:Sora;font-weight:700;font-size:19px;margin-top:6px}
+.mine .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{padding:9px 14px;border-radius:11px;font-weight:600;font-size:13px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+.btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.btn.gold{background:var(--accent);color:#231a04;border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:9px}
+.btn.danger{color:var(--danger)}
+
+.pick-banner{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent-ink);
+  border-radius:14px;padding:11px 14px;margin-top:12px;font-weight:600;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.pick-banner .btn{background:var(--surface)}
+
+.sectrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:22px 0 10px}
+.sectrow h2{font-size:16px;font-weight:600}
+.sectrow .sub{font-size:12px;color:var(--muted)}
+.sortbar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.sortbar .lbl{font-size:12px;color:var(--muted);margin-right:2px}
+.sortbtn{padding:6px 11px;border-radius:9px;background:var(--surface-2);color:var(--muted);font-size:12.5px;font-weight:600;border:1px solid transparent}
+.sortbtn.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.pricenote{font-size:11.5px;color:var(--faint);margin-left:auto}
+
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
+.ccard{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);
+  content-visibility:auto;contain-intrinsic-size:280px}
+.ccard.mine-card{border-color:var(--good);box-shadow:0 0 0 2px color-mix(in srgb,var(--good) 45%,transparent),var(--shadow)}
+.ccard .ci{aspect-ratio:734/1024;background:var(--surface-2);position:relative}
+.ccard .ci img{width:100%;height:100%;object-fit:cover}
+.ccard .ci .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--faint);font-size:11px;text-align:center;padding:10px}
+.cm-mini{font-size:10px;font-weight:700;color:var(--info);border:1px solid var(--line);padding:3px 7px;border-radius:7px}
+.cardsearch{position:relative;margin:2px 0 12px}
+.cardsearch>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--faint)}
+.cardsearch input{width:100%;padding:10px 34px 10px 36px;border-radius:11px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font-size:14px}
+.cardsearch input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.cs-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:7px;color:var(--muted);background:var(--surface-3);font-size:12px}
+.searchnote{font-size:11.5px;color:var(--muted);margin:-6px 0 10px;padding-left:2px}
+.ccard .topbadges{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+.ribbon{font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:3px 6px;border-radius:7px;background:rgba(20,22,28,.72);color:#fff;text-transform:uppercase;backdrop-filter:blur(3px)}
+.ribbon.art{background:linear-gradient(90deg,#b45309,#e0a83a);color:#231a04}
+.ribbon.top{background:var(--accent);color:#231a04}
+.ccard .info{padding:8px 9px 10px}
+.ccard .cset{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccard .cname{font-size:12.5px;font-weight:600;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccard .crow{display:flex;align-items:center;justify-content:space-between;margin-top:7px;gap:6px}
+.ccard .cprice{font-family:Sora;font-weight:700;font-size:14px}
+.ccard .cprice.usd{color:var(--muted);font-weight:600}
+.ccard .cprice .load{display:inline-block;width:34px;height:11px;border-radius:4px;background:linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2));background-size:200% 100%;animation:sh 1.1s infinite}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.ccard .rar{font-size:10px;color:var(--faint);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccard .cacts{display:flex;gap:6px;padding:0 9px 10px}
+.ccard .cacts .btn{flex:1;justify-content:center;text-align:center}
+.cm-link{color:var(--muted);font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+.cm-link svg{width:12px;height:12px}
+.upgrade-hint{font-size:10.5px;color:var(--accent-ink);font-weight:700;padding:0 9px 8px}
+
+/* ---------- sheet / modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.5);z-index:60;display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .18s}
+.scrim.show{opacity:1}
+.sheet{width:100%;max-width:520px;background:var(--surface);border-radius:20px 20px 0 0;padding:8px 16px calc(20px + env(safe-area-inset-bottom,0));box-shadow:0 -10px 40px rgba(0,0,0,.3);
+  transform:translateY(100%);transition:transform .22s cubic-bezier(.2,.8,.2,1);max-height:86vh;overflow:auto}
+.scrim.show .sheet{transform:translateY(0)}
+.sheet .grip{width:38px;height:4px;border-radius:99px;background:var(--surface-3);margin:6px auto 12px}
+.sheet h3{font-family:Sora;font-size:17px;margin-bottom:2px}
+.sheet p.s{color:var(--muted);font-size:13px;margin:0 0 14px}
+.sheet .opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px;border-radius:13px;background:var(--surface-2);margin-bottom:9px;border:1px solid var(--line)}
+.sheet .opt .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--surface);flex:0 0 auto}
+.sheet .opt .ic svg{width:20px;height:20px;color:var(--accent-ink)}
+.sheet .opt .tx{flex:1}
+.sheet .opt .tx b{display:block;font-weight:600;font-size:14px}
+.sheet .opt .tx span{font-size:12px;color:var(--muted)}
+.sheet .opt.danger .ic svg{color:var(--danger)}
+.setrow{display:flex;align-items:center;justify-content:space-between;padding:12px 2px;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+.setrow .lab b{font-size:14px;font-weight:600}
+.setrow .lab span{display:block;font-size:12px;color:var(--muted)}
+.seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
+.seg button{padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+/* ---------- toast / loader ---------- */
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0));transform:translateX(-50%) translateY(20px);z-index:80;
+  background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.3);
+  opacity:0;transition:.2s;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .undo{color:var(--accent);font-weight:700}
+.loader{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 16px;color:var(--muted)}
+.spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--surface-3);border-top-color:var(--accent);animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.errbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);margin-top:16px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<!-- ========== APP SHELL ========== -->
+<header class="bar" id="topbar">
+  <div class="bar-in">
+    <div class="row">
+      <div class="brand"><span class="pk"></span><span id="brandtxt">Pokédex Collector</span></div>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="menuBtn" aria-label="Definições e backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+      </button>
+    </div>
+    <div id="homeControls">
+      <div class="progress-wrap">
+        <div class="pbar"><i id="pbarFill" style="width:0%"></i></div>
+        <span class="pcount" id="pcount"><b>0</b>/1025</span>
+      </div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="search" type="search" placeholder="Procurar Pokémon ou nº…" autocomplete="off" enterkeyhint="search">
+      </div>
+      <div class="chips" id="filterChips">
+        <button class="chip on" data-filter="all">Todos</button>
+        <button class="chip" data-filter="owned">Que tenho</button>
+        <button class="chip" data-filter="missing">Faltam</button>
+        <button class="chip" data-filter="regional">Com regionais</button>
+      </div>
+      <div class="chips" id="genChips">
+        <button class="chip gen on" data-gen="all">Todas as gerações</button>
+        <button class="chip gen" data-gen="1">Gen 1</button><button class="chip gen" data-gen="2">Gen 2</button>
+        <button class="chip gen" data-gen="3">Gen 3</button><button class="chip gen" data-gen="4">Gen 4</button>
+        <button class="chip gen" data-gen="5">Gen 5</button><button class="chip gen" data-gen="6">Gen 6</button>
+        <button class="chip gen" data-gen="7">Gen 7</button><button class="chip gen" data-gen="8">Gen 8</button>
+        <button class="chip gen" data-gen="9">Gen 9</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="homeView" class="wrap"><div class="grid" id="grid"></div><div id="gridEmpty" class="empty" hidden></div></div>
+  <div id="detailView" class="detail" hidden></div>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ============================ config & data ============================ */
+const GQL = 'https://api.tcgdex.net/v2/graphql';
+const REST = 'https://api.tcgdex.net/v2/en/cards/';
+const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
+const cardImg = (base, q) => base ? `${base}/${q}.webp` : null;
+const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="%23b9bfca" stroke-width="4"/><line x1="10" y1="32" x2="54" y2="32" stroke="%23b9bfca" stroke-width="4"/><circle cx="32" cy="32" r="7" fill="none" stroke="%23b9bfca" stroke-width="4"/></svg>');
+
+const REGION_LABEL = {alola:'Alolan', galar:'Galarian', hisui:'Hisuian', paldea:'Paldean'};
+const FORM_ORDER = ['base','mega','alola','galar','hisui','paldea','other'];
+const FORM_LABEL = {base:'Base', mega:'Mega', alola:'Alolan', galar:'Galarian', hisui:'Hisuian', paldea:'Paldean', other:'Outras'};
+const GEN_RANGES = {1:[1,151],2:[152,251],3:[252,386],4:[387,493],5:[494,649],6:[650,721],7:[722,809],8:[810,905],9:[906,1025]};
+
+// rarity ranking (best -> worst) for fallback sort & tiering
+const RARITY_ORDER = ['Special illustration rare','Mega Hyper Rare','Hyper rare','Crown','Secret Rare','Rainbow Rare','Gold',
+  'Shiny rare VMAX','Shiny rare','Two Shiny','One Shiny','Illustration rare','Ultra Rare','Amazing Rare','Radiant Rare',
+  'Double rare','Holo Rare VSTAR','Holo Rare VMAX','Holo Rare V','Rare Holo LV.X','Rare Holo','Holo Rare','Classic Collection',
+  'Four Diamond','Three Diamond','Three Star','Two Star','One Star','Two Diamond','One Diamond','Rare','Promo','Uncommon','Common','None'];
+const rarityRank = r => { const i = RARITY_ORDER.indexOf(r); return i<0 ? RARITY_ORDER.indexOf('Rare') : i; };
+const ART_KEYS = ['illustration','full art','hyper','secret','rainbow','gold','shiny','crown','amazing','radiant','star'];
+const isArtRarity = r => !!r && ART_KEYS.some(k => r.toLowerCase().includes(k));
+
+let NATIONAL = [], REGIONAL = {}, REG_TOTAL = 0;
+
+/* ============================ storage ============================ */
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let collection = LS.get('pdc.collection', {});   // slotId -> {cardId,name,setName,image,rarity,price,cur,addedAt}
+let settings = Object.assign({filter:'all', gen:'all', listImage:'pokemon', sort:'value', theme:'system'}, LS.get('pdc.settings', {}));
+const saveCollection = () => LS.set('pdc.collection', collection);
+const saveSettings = () => LS.set('pdc.settings', settings);
+const slotId = (n, form) => (form && form!=='base') ? `d${n}:${form}` : `d${n}`;
+
+// IndexedDB cache for API responses
+let _db=null;
+function idb(){ return _db || (_db = new Promise((res,rej)=>{ let r=indexedDB.open('pdc-cache',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); })); }
+async function idbGet(k){ try{ const db=await idb(); return await new Promise((res)=>{ let t=db.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }); }catch(e){ return null; } }
+async function idbSet(k,v){ try{ const db=await idb(); const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); }catch(e){} }
+const DAY = 864e5;
+
+/* ============================ api ============================ */
+async function fetchDexCards(n){
+  const key = 'cards2:'+n;
+  const c = await idbGet(key);
+  if (c && (Date.now()-c.ts) < 14*DAY) return c.cards;
+  const query = `{ cards(filters:{dexId:${n}}) { id localId name rarity image suffix variants{holo reverse normal firstEdition} set{id name cardCount{official total}} } }`;
+  const r = await fetch(GQL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})});
+  if(!r.ok) throw new Error('network');
+  const j = await r.json();
+  if(j.errors) throw new Error('api');
+  const cards = j.data.cards || [];
+  idbSet(key, {cards, ts:Date.now()});
+  return cards;
+}
+async function fetchPrice(id){
+  const key = 'price:'+id;
+  const c = await idbGet(key);
+  if (c && (Date.now()-c.ts) < 3*DAY) return c.val;
+  let val = null;
+  try{
+    const r = await fetch(REST+id);
+    if(r.ok){
+      const j = await r.json();
+      const cm = j.pricing && j.pricing.cardmarket;
+      const tp = j.pricing && j.pricing.tcgplayer;
+      if(cm && (cm.trend||cm.avg||cm.low)!=null){
+        val = {value: cm.trend ?? cm.avg ?? cm.low, cur:'EUR', low:cm.low, avg:cm.avg, trend:cm.trend, updated:cm.updated};
+      } else if(tp){
+        let mp=null; for(const k in tp){ if(tp[k] && typeof tp[k]==='object' && tp[k].marketPrice!=null){ mp=tp[k].marketPrice; break; } }
+        if(mp!=null) val = {value:mp, cur:'USD'};
+      }
+    }
+  }catch(e){}
+  idbSet(key, {val, ts:Date.now()});
+  return val;
+}
+// Best-effort image fallback for cards TCGdex has no artwork for (via pokemontcg.io).
+// Cardmarket has no image API and blocks hotlinking, so it can't be used here.
+async function fetchFallbackImage(card){
+  const key = 'img2:'+card.id;
+  const c = await idbGet(key);
+  if(c) return c.url;             // cached (url may be null = "tried, none")
+  let url = null;
+  try{
+    const name = card.name.replace(/[":\\]/g,' ').replace(/\s+/g,' ').trim();
+    const num = card.localId ? String(card.localId).replace(/^0+/,'') : '';
+    const q = `name:"${name}"` + (num?` number:${num}`:'');
+    const r = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=1&select=images`);
+    if(r.ok){ const j = await r.json(); const d = j.data && j.data[0]; if(d && d.images) url = d.images.small || d.images.large; }
+  }catch(e){}
+  idbSet(key, {url, ts:Date.now()});
+  return url;
+}
+async function pool(items, worker, size=8){
+  const it = items[Symbol.iterator](); let x;
+  const run = async()=>{ while(!(x=it.next()).done){ await worker(x.value); } };
+  await Promise.all(Array(Math.min(size, items.length||1)).fill(0).map(run));
+}
+const fmtPrice = p => !p||p.value==null ? '—' : (p.cur==='USD'?'$':'€') + p.value.toFixed(2);
+
+/* ============================ form detection ============================ */
+function detectForm(name){
+  if(/^Alolan\b/i.test(name)) return 'alola';
+  if(/^Galarian\b/i.test(name)) return 'galar';
+  if(/^Hisuian\b/i.test(name)) return 'hisui';
+  if(/^Paldean\b/i.test(name)) return 'paldea';
+  if(/^Mega\b/i.test(name) || /^M\s+\S/.test(name)) return 'mega';
+  return 'base';
+}
+
+/* ============================ progress ============================ */
+function progress(){
+  let base=0, reg=0, other=0;
+  for(const k in collection){
+    if(/^d\d+$/.test(k)) base++;
+    else{ const f=k.split(':')[1]; if(REGION_LABEL[f]) reg++; else other++; }
+  }
+  return {base, reg, other};
+}
+function renderProgress(){
+  const p = progress();
+  const pct = Math.round(p.base/NATIONAL.length*100);
+  document.getElementById('pbarFill').style.width = pct+'%';
+  document.getElementById('pcount').innerHTML = `<b>${p.base}</b>/${NATIONAL.length}`;
+}
+
+/* ============================ grid ============================ */
+let searchTerm='';
+function passesFilter(mon){
+  const owned = !!collection[slotId(mon.n)];
+  if(settings.filter==='owned' && !owned) return false;
+  if(settings.filter==='missing' && owned) return false;
+  if(settings.filter==='regional' && !REGIONAL[mon.n]) return false;
+  if(settings.gen!=='all'){ const [a,b]=GEN_RANGES[settings.gen]; if(mon.n<a||mon.n>b) return false; }
+  if(searchTerm){ const t=searchTerm.toLowerCase(); if(!mon.name.toLowerCase().includes(t) && String(mon.n)!==t && String(mon.n).padStart(3,'0')!==t) return false; }
+  return true;
+}
+function tileHTML(mon){
+  const own = collection[slotId(mon.n)];
+  const owned = !!own;
+  const regs = REGIONAL[mon.n];
+  const useCard = settings.listImage==='card' && own && own.image;
+  const img = useCard ? cardImg(own.image,'low') : ARTWORK(mon.n);
+  let sub='';
+  if(owned){
+    if(own.cardId) sub = `<div class="ownedcard">🃏 ${own.setName||''} ${own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''}</div>`;
+    else sub = `<div class="nocardtag">✔ tenho · sem carta escolhida</div>`;
+  } else sub = `<div class="nocardtag"></div>`;
+  return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''}" data-n="${mon.n}">
+    <div class="rbadges">${regs?`<span class="rbadge reg">${regs.length>1?'REG':REGION_LABEL[regs[0]].slice(0,3).toUpperCase()}</span>`:''}</div>
+    <button class="check" data-check="${mon.n}" aria-label="${owned?'Tenho':'Marcar'}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    </button>
+    <div class="imgbox"><img loading="lazy" decoding="async" src="${img}" alt="${mon.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
+    <div class="num tnum">#${String(mon.n).padStart(4,'0')}</div>
+    <div class="nm">${mon.name}</div>
+    ${sub}
+  </article>`;
+}
+function renderGrid(){
+  const list = NATIONAL.filter(passesFilter);
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('gridEmpty');
+  if(!list.length){ grid.innerHTML=''; empty.hidden=false; empty.innerHTML='<b>Nada por aqui</b><br>Experimenta outro filtro ou pesquisa.'; return; }
+  empty.hidden=true;
+  grid.innerHTML = list.map(tileHTML).join('');
+  renderProgress();
+}
+
+/* ============================ detail ============================ */
+let curDex=null, curForm='base', curCards=null, sortMode=settings.sort, priceMap={}, priceToken=0, pickIntent=false, cardQuery='', imgToken=0;
+
+function showView(which){
+  document.getElementById('homeView').hidden = which!=='home';
+  document.getElementById('homeControls').hidden = which!=='home';
+  document.getElementById('detailView').hidden = which!=='detail';
+  document.getElementById('brandtxt').textContent = which==='home' ? 'Pokédex Collector' : '';
+}
+function openDetail(n, pick){
+  curDex=n; curForm='base'; curCards=null; priceMap={}; pickIntent=!!pick;
+  location.hash = 'p'+n;
+}
+function closeDetail(){ location.hash=''; }
+
+async function renderDetail(n){
+  curDex=n; curForm='base'; curCards=null; priceMap={}; cardQuery='';   // own the state so direct URL / reload works
+  showView('detail');
+  const mon = NATIONAL.find(m=>m.n===n);
+  const el = document.getElementById('detailView');
+  window.scrollTo(0,0);
+  el.innerHTML = `<div class="dtop"><button class="back" id="backBtn" aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="dtitle"><div class="num tnum">#${String(n).padStart(4,'0')}</div><h1>${mon?mon.name:''}</h1></div></div>
+    <div class="loader"><div class="spin"></div><span>A carregar cartas…</span></div>`;
+  document.getElementById('backBtn').onclick = closeDetail;
+  let cards;
+  try{ cards = await fetchDexCards(n); }
+  catch(e){
+    if(curDex!==n) return;
+    el.querySelector('.loader').outerHTML = `<div class="errbox">Não consegui carregar as cartas (sem ligação?).<br><br><button class="btn pri" onclick="renderDetail(${n})">Tentar de novo</button></div>`;
+    return;
+  }
+  if(curDex!==n) return;
+  // partition by form
+  const byForm = {};
+  for(const c of cards){ const f=detectForm(c.name); (byForm[f]=byForm[f]||[]).push(c); }
+  curCards = byForm;
+  const formsPresent = FORM_ORDER.filter(f=>byForm[f] && byForm[f].length);
+  if(!formsPresent.length){ el.querySelector('.loader').outerHTML = `<div class="errbox">Ainda não há cartas deste Pokémon na base de dados.</div>`; return; }
+  if(!byForm[curForm]) curForm = formsPresent[0];
+  paintDetail(mon, formsPresent);
+}
+
+function paintDetail(mon, formsPresent){
+  const el = document.getElementById('detailView');
+  const tabs = formsPresent.map(f=>{
+    const sid = slotId(mon.n, f);
+    const has = !!collection[sid];
+    return `<button class="ftab ${f===curForm?'on':''}" data-form="${f}">${FORM_LABEL[f]}${has?'<span class="dot"></span>':''}</button>`;
+  }).join('');
+  el.innerHTML = `<div class="dtop"><button class="back" id="backBtn" aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="dtitle"><div class="num tnum">#${String(mon.n).padStart(4,'0')}</div><h1>${mon.name}</h1></div></div>
+    ${formsPresent.length>1?`<div class="ftabs">${tabs}</div>`:''}
+    <div id="formBody"></div>`;
+  document.getElementById('backBtn').onclick = closeDetail;
+  el.querySelectorAll('.ftab').forEach(b=> b.onclick=()=>{ curForm=b.dataset.form; paintDetail(mon, formsPresent); });
+  paintForm(mon);
+}
+
+function paintForm(mon){
+  const body = document.getElementById('formBody');
+  const sid = slotId(mon.n, curForm);
+  const own = collection[sid];
+  const formName = curForm==='base' ? mon.name : `${FORM_LABEL[curForm]==='Mega'?'Mega ':''}${mon.name}${REGION_LABEL[curForm]?' ('+REGION_LABEL[curForm]+')':''}`;
+
+  // "A minha carta"
+  let mine;
+  if(own && own.cardId){
+    mine = `<div class="mine">
+      <div class="cardimg"><img loading="lazy" src="${cardImg(own.image,'high')||PLACEHOLDER}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
+      <div class="meta"><div class="k">A minha carta</div><h3>${own.name||formName}</h3>
+        <div class="set">${own.setName||''}${own.no?' · <span class="tnum">'+own.no+'</span>':''}</div>
+        <div class="price">${own.price?fmtPrice(own.price):'—'}</div>
+        <div class="acts"><button class="btn sm" id="changeCard">Trocar carta</button><button class="btn sm danger" id="removeOwn">Remover</button></div>
+      </div></div>`;
+  } else if(own){
+    mine = `<div class="mine none"><div class="k" style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);font-weight:700">${formName}</div>
+      <p style="margin:8px 0 12px">Marcaste como <b>tido</b>, mas ainda não escolheste a carta.</p>
+      <button class="btn gold" id="pickBelow">Escolher a minha carta</button>
+      <button class="btn ghost danger sm" id="removeOwn" style="margin-left:6px">Já não tenho</button></div>`;
+  } else {
+    mine = `<div class="pick-banner"><span>${pickIntent?'Escolhe a carta que tens 👇':'Ainda não tens este Pokémon.'}</span>
+      <button class="btn sm" id="markNoCard">Marcar sem carta</button></div>`;
+  }
+
+  body.innerHTML = mine + `
+    <div class="sectrow"><h2>Cartas disponíveis</h2><span class="sub" id="cardCountSub"></span></div>
+    <div class="cardsearch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="cardSearch" type="search" placeholder="Procurar carta: nome, nº (ex. 006 ou 6/165) ou set…" value="${cardQuery.replace(/"/g,'&quot;')}" autocomplete="off" enterkeyhint="search">
+      <button class="cs-clear" id="csClear" aria-label="Limpar" ${cardQuery?'':'hidden'}>✕</button>
+    </div>
+    ${cardQuery?'<div class="searchnote">A procurar em todas as formas deste Pokémon.</div>':''}
+    <div class="sortbar">
+      <span class="lbl">Ordenar:</span>
+      <button class="sortbtn ${sortMode==='value'?'on':''}" data-sort="value">Valor €</button>
+      <button class="sortbtn ${sortMode==='rarity'?'on':''}" data-sort="rarity">Raridade</button>
+      <button class="sortbtn ${sortMode==='recent'?'on':''}" data-sort="recent">Set</button>
+      <span class="pricenote" id="priceNote"></span>
+    </div>
+    <div class="cgrid" id="cgrid"></div>`;
+
+  // wire "mine" actions
+  const changeBtn = body.querySelector('#changeCard'); if(changeBtn) changeBtn.onclick=()=>{ document.getElementById('cgrid').scrollIntoView({behavior:'smooth'}); };
+  const rem = body.querySelector('#removeOwn'); if(rem) rem.onclick=()=>{ delete collection[sid]; saveCollection(); toast('Removido'); afterOwnChange(mon); };
+  const pb = body.querySelector('#pickBelow'); if(pb) pb.onclick=()=>document.getElementById('cgrid').scrollIntoView({behavior:'smooth'});
+  const mnc = body.querySelector('#markNoCard'); if(mnc) mnc.onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); toast('Marcado ✔'); pickIntent=false; afterOwnChange(mon); };
+
+  body.querySelectorAll('.sortbtn').forEach(b=> b.onclick=()=>{ sortMode=b.dataset.sort; settings.sort=sortMode; saveSettings(); paintForm(mon); });
+
+  // wire card search (searches across all forms of this Pokémon)
+  const csi = body.querySelector('#cardSearch');
+  const csc = body.querySelector('#csClear');
+  if(csi){ let t=null; csi.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>{ cardQuery=csi.value.trim(); if(csc) csc.hidden=!cardQuery; renderCards(mon, sid); }, 150); }); }
+  if(csc){ csc.onclick=()=>{ cardQuery=''; csi.value=''; csc.hidden=true; renderCards(mon, sid); csi.focus(); }; }
+
+  renderCards(mon, sid);
+}
+
+function sortCards(cards){
+  if(sortMode==='rarity') return cards.sort((a,b)=> rarityRank(a.rarity)-rarityRank(b.rarity));
+  if(sortMode==='recent') return cards.sort((a,b)=> (a.set.id<b.set.id?1:-1));
+  // value
+  return cards.sort((a,b)=>{
+    const pa=priceMap[a.id], pb=priceMap[b.id];
+    const va=pa&&pa.value!=null?pa.value:-1, vb=pb&&pb.value!=null?pb.value:-1;
+    if(vb!==va) return vb-va;
+    return rarityRank(a.rarity)-rarityRank(b.rarity);
+  });
+}
+function bestValue(cards){
+  let best=null;
+  for(const c of cards){ const p=priceMap[c.id]; if(p&&p.value!=null&&(!best||p.value>best.value)) best={id:c.id,value:p.value,cur:p.cur,name:c.name,set:c.set.name}; }
+  return best;
+}
+const cardNo = c => c.localId ? (c.localId + (c.set.cardCount&&c.set.cardCount.official?('/'+c.set.cardCount.official):'')) : '';
+function cardHTML(c, ownedIds, topId){
+  const p = priceMap[c.id];
+  const art = isArtRarity(c.rarity);
+  const isMine = ownedIds.has(c.id);
+  const cmSearch = `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(c.name)}`;
+  const priceHTML = p===undefined ? '<span class="load"></span>' : `<span class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</span>`;
+  const no = cardNo(c);
+  const imgCell = c.image
+    ? `<img loading="lazy" decoding="async" src="${cardImg(c.image,'low')}" alt="${c.name}" onerror="this.style.display='none';this.nextElementSibling.hidden=false">
+       <div class="ph" hidden>Sem imagem<a class="cm-mini" href="${cmSearch}" target="_blank" rel="noopener">ver no Cardmarket ↗</a></div>`
+    : `<div class="ph">Sem imagem<a class="cm-mini" href="${cmSearch}" target="_blank" rel="noopener">ver no Cardmarket ↗</a></div>`;
+  return `<div class="ccard ${isMine?'mine-card':''}" data-id="${c.id}" data-noimg="${c.image?0:1}">
+    <div class="ci">${imgCell}
+      <div class="topbadges">${art?'<span class="ribbon art">★ Art</span>':'<span></span>'}${c.id===topId?'<span class="ribbon top">💎 TOP €</span>':''}</div>
+    </div>
+    <div class="info">
+      <div class="cset">${c.set.name}${no?` · <span class="tnum">${no}</span>`:''}</div>
+      <div class="cname">${c.name}</div>
+      <div class="rar">${c.rarity||'—'}</div>
+      <div class="crow"><span class="cprice">${priceHTML}</span>
+        <a class="cm-link" href="${cmSearch}" target="_blank" rel="noopener">Cardmarket<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg></a></div>
+    </div>
+    <div class="cacts"><button class="btn sm ${isMine?'gold':'pri'}" data-pick="${c.id}">${isMine?'✔ É a minha':'Tenho esta'}</button></div>
+  </div>`;
+}
+function allCardsOf(){ let a=[]; for(const f in curCards) a=a.concat(curCards[f]); return a; }
+function ownedIdSet(){ const s=new Set(); for(const k in collection){ const o=collection[k]; if(o&&o.cardId) s.add(o.cardId); } return s; }
+function visibleCards(){
+  if(cardQuery){
+    const q = cardQuery.toLowerCase().replace(/\s+/g,'');
+    return allCardsOf().filter(c=>{
+      const hay = (c.name+' '+c.set.name+' '+c.id+' '+(c.localId||'')+' '+cardNo(c)+' '+(c.rarity||'')).toLowerCase().replace(/\s+/g,'');
+      return hay.includes(q);
+    });
+  }
+  return (curCards[curForm]||[]).slice();
+}
+function renderCards(mon, sid){
+  const grid = document.getElementById('cgrid'); if(!grid) return;
+  const cards = visibleCards();
+  const oids = ownedIdSet();
+  const sorted = sortCards(cards.slice());
+  const top = sortMode==='value' ? bestValue(sorted) : null;
+  grid.innerHTML = sorted.length ? sorted.map(c=>cardHTML(c, oids, top&&top.id)).join('')
+    : `<div class="errbox" style="grid-column:1/-1">Nenhuma carta encontrada.</div>`;
+  const byId = {}; allCardsOf().forEach(c=>byId[c.id]=c);
+  grid.querySelectorAll('[data-pick]').forEach(b=> b.onclick=()=>choose(mon, byId[b.dataset.pick]));
+  const sub = document.getElementById('cardCountSub');
+  if(sub) sub.textContent = cardQuery ? `${cards.length} resultado${cards.length!==1?'s':''}` : `${cards.length} carta${cards.length!==1?'s':''}`;
+  ensurePrices(mon, sid, cards);
+  loadFallbackImages(cards);
+}
+async function loadFallbackImages(cards){
+  const need = cards.filter(c=>!c.image);
+  if(!need.length) return;
+  const my = ++imgToken;
+  await pool(need, async c=>{
+    if(my!==imgToken) return;
+    const url = await fetchFallbackImage(c);
+    if(!url || my!==imgToken) return;
+    const ci = document.querySelector(`.ccard[data-id="${CSS.escape(c.id)}"] .ci`);
+    if(ci){ const ph=ci.querySelector('.ph'); if(ph) ph.remove();
+      const img=document.createElement('img'); img.loading='lazy'; img.decoding='async'; img.src=url; img.alt=c.name;
+      ci.insertBefore(img, ci.firstChild); }
+  }, 3);
+}
+async function ensurePrices(mon, sid, cards){
+  const note = document.getElementById('priceNote');
+  const need = cards.filter(c=>priceMap[c.id]===undefined);
+  if(need.length){
+    const token = ++priceToken;
+    let done=0, total=need.length;
+    if(note) note.textContent = `preços 0/${total}…`;
+    await pool(need, async c=>{
+      if(token!==priceToken) return;
+      const p = await fetchPrice(c.id);
+      priceMap[c.id] = p || {value:null};
+      done++;
+      if(token!==priceToken) return;
+      const cell = document.querySelector(`.ccard[data-id="${CSS.escape(c.id)}"] .cprice`);
+      if(cell) cell.outerHTML = `<span class="cprice ${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</span>`;
+      if(note) note.textContent = done<total ? `preços ${done}/${total}…` : '';
+    }, 8);
+    if(token!==priceToken) return;
+  }
+  if(note) note.textContent='';
+  if(sortMode==='value') reorderByValue(sid, cards);   // reorder DOM in place, no re-fetch
+  showUpgradeHint(sid, cards);
+}
+function reorderByValue(sid, cards){
+  const grid = document.getElementById('cgrid'); if(!grid) return;
+  const sorted = sortCards(cards.slice());
+  const nodes = {}; grid.querySelectorAll('.ccard').forEach(n=> nodes[n.dataset.id]=n);
+  sorted.forEach(c=>{ const n=nodes[c.id]; if(n) grid.appendChild(n); });
+  grid.querySelectorAll('.ribbon.top').forEach(x=>x.remove());
+  const best = bestValue(sorted);
+  if(best && nodes[best.id]){ const tb = nodes[best.id].querySelector('.topbadges'); if(tb) tb.insertAdjacentHTML('beforeend','<span class="ribbon top">💎 TOP €</span>'); }
+}
+function showUpgradeHint(sid, cards){
+  const own = collection[sid];
+  if(document.getElementById('upHint')) return;
+  if(own && own.cardId && own.price && own.price.value!=null){
+    const best = bestValue(cards);
+    if(best && best.id!==own.cardId && best.value > own.price.value*1.15){
+      const acts = document.querySelector('#formBody .mine .meta .acts');
+      if(acts){
+        const d=document.createElement('div'); d.id='upHint'; d.className='upgrade-hint'; d.style.padding='8px 0 0';
+        d.innerHTML = `⬆ Podias valorizar: <b>${best.name}</b> (${best.set}) vale ${(best.cur==='USD'?'$':'€')+best.value.toFixed(2)}.`;
+        acts.after(d);
+      }
+    }
+  }
+}
+function choose(mon, card){
+  if(!card) return;
+  const f = detectForm(card.name);
+  const sid = slotId(mon.n, f);
+  const p = priceMap[card.id];
+  collection[sid] = {cardId:card.id, name:card.name, setName:card.set.name, image:card.image, rarity:card.rarity, no:cardNo(card), price:p&&p.value!=null?p:null, cur:p&&p.cur, addedAt:Date.now()};
+  saveCollection();
+  pickIntent=false; cardQuery='';
+  toast('Guardado ✔ '+card.name);
+  curForm = f;
+  const formsPresent = FORM_ORDER.filter(x=>curCards[x] && curCards[x].length);
+  paintDetail(mon, formsPresent);
+  renderProgress();
+}
+function afterOwnChange(mon){
+  // recompute forms present and repaint detail (keeps cache)
+  const formsPresent = FORM_ORDER.filter(f=>curCards[f] && curCards[f].length);
+  paintDetail(mon, formsPresent);
+  renderProgress();
+}
+
+/* ============================ toast ============================ */
+let toastT=null, lastRemoved=null;
+function toast(msg, undo){
+  const t=document.getElementById('toast'); t.hidden=false;
+  t.innerHTML = msg + (undo?' <span class="undo" id="undoBtn">Anular</span>':'');
+  requestAnimationFrame(()=>t.classList.add('show'));
+  if(undo) document.getElementById('undoBtn').onclick=undo;
+  clearTimeout(toastT); toastT=setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.hidden=true,220); }, undo?4200:1900);
+}
+
+/* ============================ grid interactions ============================ */
+document.getElementById('grid').addEventListener('click', e=>{
+  const chk = e.target.closest('[data-check]');
+  if(chk){ e.stopPropagation(); const n=+chk.dataset.check; const sid=slotId(n);
+    if(collection[sid]){ // unmark
+      const removed = collection[sid]; delete collection[sid]; saveCollection(); renderGrid();
+      toast('Removido', ()=>{ collection[sid]=removed; saveCollection(); renderGrid(); toast('Reposto ✔'); });
+    } else { openDetail(n, true); } // marking asks which card -> open detail in pick mode
+    return;
+  }
+  const tile = e.target.closest('.tile'); if(tile) openDetail(+tile.dataset.n, false);
+});
+
+/* ============================ filters / search ============================ */
+document.getElementById('filterChips').addEventListener('click', e=>{ const b=e.target.closest('[data-filter]'); if(!b)return;
+  settings.filter=b.dataset.filter; saveSettings();
+  document.querySelectorAll('#filterChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); });
+document.getElementById('genChips').addEventListener('click', e=>{ const b=e.target.closest('[data-gen]'); if(!b)return;
+  settings.gen=b.dataset.gen; saveSettings();
+  document.querySelectorAll('#genChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); });
+let searchDeb=null;
+document.getElementById('search').addEventListener('input', e=>{ clearTimeout(searchDeb); searchDeb=setTimeout(()=>{ searchTerm=e.target.value.trim(); renderGrid(); }, 160); });
+
+/* ============================ menu / settings sheet ============================ */
+function openSheet(html){
+  const scrim=document.createElement('div'); scrim.className='scrim';
+  scrim.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><div class="grip"></div>${html}</div>`;
+  document.body.appendChild(scrim);
+  requestAnimationFrame(()=>scrim.classList.add('show'));
+  const close=()=>{ scrim.classList.remove('show'); setTimeout(()=>scrim.remove(),240); };
+  scrim.addEventListener('click', e=>{ if(e.target===scrim) close(); });
+  return {scrim, close};
+}
+document.getElementById('menuBtn').onclick = ()=>{
+  const p=progress();
+  const {scrim,close}=openSheet(`
+    <h3>Definições & backup</h3>
+    <p class="s">${p.base}/${NATIONAL.length} espécies · ${p.reg}/${REG_TOTAL} regionais · ${p.other} outras formas</p>
+    <div class="setrow"><div class="lab"><b>Imagem na lista</b><span>o que aparece em cada Pokémon</span></div>
+      <div class="seg" id="segImg"><button data-v="pokemon" class="${settings.listImage==='pokemon'?'on':''}">Pokémon</button><button data-v="card" class="${settings.listImage==='card'?'on':''}">Carta que tenho</button></div></div>
+    <div class="setrow"><div class="lab"><b>Tema</b><span>aspeto da app</span></div>
+      <div class="seg" id="segTheme"><button data-v="system" class="${settings.theme==='system'?'on':''}">Auto</button><button data-v="light" class="${settings.theme==='light'?'on':''}">Claro</button><button data-v="dark" class="${settings.theme==='dark'?'on':''}">Escuro</button></div></div>
+    <div style="height:8px"></div>
+    <button class="opt" id="exportBtn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></div><div class="tx"><b>Exportar backup</b><span>guardar a coleção num ficheiro</span></div></button>
+    <label class="opt" for="importFile" style="cursor:pointer"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 7V5a2 2 0 012-2h12a2 2 0 012 2v2"/></svg></div><div class="tx"><b>Importar backup</b><span>restaurar de um ficheiro</span></div><input id="importFile" type="file" accept="application/json" hidden></label>
+    <div style="height:6px"></div>
+    <p class="s" style="text-align:center;margin:6px 0 0">Preços: Cardmarket via TCGdex · imagens PokéAPI/TCGdex</p>
+  `);
+  scrim.querySelector('#segImg').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b)return; settings.listImage=b.dataset.v; saveSettings(); scrim.querySelectorAll('#segImg button').forEach(x=>x.classList.toggle('on',x===b)); renderGrid(); };
+  scrim.querySelector('#segTheme').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b)return; settings.theme=b.dataset.v; saveSettings(); applyTheme(); scrim.querySelectorAll('#segTheme button').forEach(x=>x.classList.toggle('on',x===b)); };
+  scrim.querySelector('#exportBtn').onclick=()=>{ exportBackup(); close(); };
+  scrim.querySelector('#importFile').onchange=e=>{ importBackup(e.target.files[0], close); };
+};
+function exportBackup(){
+  const data = JSON.stringify({app:'pokedex-collector', v:1, exported:new Date().toISOString(), collection}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`pokedex-colecao-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  toast('Backup exportado ✔');
+}
+function importBackup(file, close){
+  if(!file) return; const r=new FileReader();
+  r.onload=()=>{ try{ const j=JSON.parse(r.result); const c=j.collection||j; if(typeof c!=='object') throw 0;
+    const n=Object.keys(c).length; collection=c; saveCollection(); renderGrid();
+    if(close) close(); toast(`Importado ✔ ${n} registos`);
+  }catch(e){ toast('Ficheiro inválido'); } };
+  r.readAsText(file);
+}
+
+/* ============================ theme ============================ */
+function applyTheme(){
+  const t=settings.theme;
+  if(t==='system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+  const meta=document.querySelector('meta[name=theme-color]');
+  const dark = t==='dark' || (t==='system' && matchMedia('(prefers-color-scheme:dark)').matches);
+  if(meta) meta.content = dark ? '#14161c' : '#f3f4f7';
+}
+
+/* ============================ router ============================ */
+function route(){
+  const h=location.hash.replace('#','');
+  const m=h.match(/^p(\d+)$/);
+  if(m){ renderDetail(+m[1]); }
+  else { showView('home'); curDex=null; }
+}
+window.addEventListener('hashchange', route);
+
+/* ============================ boot ============================ */
+async function boot(){
+  applyTheme();
+  matchMedia('(prefers-color-scheme:dark)').addEventListener?.('change', ()=>{ if(settings.theme==='system') applyTheme(); });
+  // restore filter chips ui
+  document.querySelectorAll('#filterChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.filter===settings.filter));
+  document.querySelectorAll('#genChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.gen===settings.gen));
+  sortMode = settings.sort || 'value';
+  try{
+    const [nat, reg] = await Promise.all([ fetch('national.json').then(r=>r.json()), fetch('regional.json').then(r=>r.json()) ]);
+    NATIONAL = nat; REGIONAL = reg; REG_TOTAL = Object.values(reg).reduce((s,a)=>s+a.length,0);
+  }catch(e){
+    document.getElementById('grid').innerHTML = '<div class="errbox">Não consegui carregar a lista base. Recarrega a página.</div>'; return;
+  }
+  renderGrid();
+  route();
+  if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+}
+boot();
+</script>
+</body>
+</html>
