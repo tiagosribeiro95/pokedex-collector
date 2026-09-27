@@ -278,6 +278,14 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .scan-res-actions{display:flex;gap:10px;margin-top:14px}
 .scan-res-actions .btn{flex:1;justify-content:center;text-align:center;padding:13px}
 .scan-ocr{font-size:11px;color:#788;margin-top:10px;word-break:break-word}
+.scan-chooser{display:flex;flex-direction:column;height:100%;padding:16px 18px;text-align:left}
+.scan-chooser-h{text-align:center;color:#c8ccd6;font-size:14px;margin-bottom:12px}
+.scan-chooser-h b{color:#fff}
+.scan-chooser .cardsearch input{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:#fff}
+.setlist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
+.setrow2{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.08)}
+.setrow2 b{font-size:14px;font-weight:600}
+.setrow2 span{font-size:11px;color:#e6b53f;font-weight:700;flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -1019,6 +1027,43 @@ async function findCardId(setId, num){
   }catch(e){ return null; }
 }
 async function fetchCardFull(id){ try{ const r=await fetch(`https://api.tcgdex.net/v2/en/cards/${id}`); return r.ok?r.json():null; }catch(e){ return null; } }
+let _setsList=null;
+async function fetchSetsList(){
+  if(_setsList) return _setsList;
+  const cached=await idbGet('setslist');
+  if(cached && cached.list && (Date.now()-cached.ts)<30*DAY){ _setsList=cached.list; return _setsList; }
+  try{ const r=await fetch('https://api.tcgdex.net/v2/en/sets'); const arr=await r.json();
+    _setsList=arr.map(s=>({id:s.id, name:s.name, code:SETCODES[s.id]||''})).reverse();  // recentes primeiro
+    idbSet('setslist',{list:_setsList, ts:Date.now()});
+  }catch(e){ _setsList=[]; }
+  return _setsList;
+}
+// fallback: read the number but not the set → user picks the set, then we identify
+async function showSetChooser(ov, num, retry, close){
+  const stage=ov.querySelector('.scan-stage'); stage.style.flex='1';
+  stage.innerHTML=`<div class="scan-chooser">
+    <div class="scan-chooser-h">Li o número <b>${num}</b>, mas não reconheci o set.<br>De que set é esta carta?</div>
+    <div class="cardsearch pk" style="margin:0 0 10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="setSearch" type="search" placeholder="Procurar set (ex. 30th, 151, Mega)…" autocomplete="off"></div>
+    <div id="setList" class="setlist"></div></div>`;
+  const acts=ov.querySelector('.scan-actions'); if(acts) acts.innerHTML=`<button class="scan-capture" id="scanRetry3">Voltar a ler</button>`;
+  const rb=ov.querySelector('#scanRetry3'); if(rb) rb.onclick=retry;
+  const sets=await fetchSetsList();
+  const listEl=stage.querySelector('#setList');
+  const draw=q=>{
+    const ql=(q||'').toLowerCase();
+    const filt=(ql?sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql)):sets).slice(0,50);
+    listEl.innerHTML=filt.map(s=>`<button class="setrow2" data-sid="${s.id}"><b>${s.name}</b>${s.code?'<span>'+s.code+'</span>':''}</button>`).join('')||'<div style="color:#889;padding:10px">Nada encontrado.</div>';
+    listEl.querySelectorAll('[data-sid]').forEach(b=> b.onclick=async()=>{
+      listEl.innerHTML='<div class="scan-msg" style="padding:24px"><div class="spin" style="margin:0 auto"></div></div>';
+      const id=await findCardId(b.dataset.sid, num); const card=id?await fetchCardFull(id):null;
+      if(card) showScanCard(ov, card, retry, close);
+      else { toast('Não encontrei o nº '+num+' nesse set'); draw(q); }
+    });
+  };
+  draw('');
+  const si=stage.querySelector('#setSearch'); let t=null; si.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>draw(si.value.trim()),150); });
+}
 async function openScan(){
   let stream=null;
   const ov=document.createElement('div'); ov.className='scan-overlay';
@@ -1085,10 +1130,11 @@ async function handleScanResult(ov, parsed, close, strip){
     for(const setId of setIds){ const id=await findCardId(setId, parsed.num); if(id){ card=await fetchCardFull(id); if(card) break; } }
     if(card){ return showScanCard(ov, card, retry, close); }
   }
+  if(parsed.num){ return showSetChooser(ov, parsed.num, retry, close); }   // leu o número → escolher set
   const readTxt = (parsed.raw||'').replace(/\s+/g,' ').trim();
   stage.innerHTML=`<div class="scan-msg">
     ${strip?('<img src="'+strip+'" alt="" style="max-width:82%;border-radius:8px;margin-bottom:14px">'):''}
-    ${parsed.num?('Li o número <b>'+parsed.num+'</b>'+(parsed.code?' e código <b>'+parsed.code+'</b>':' mas não reconheci o código do set')+'.'):'Não consegui ler o número.'}
+    Não consegui ler o número.
     ${readTxt?('<br><span class="scan-ocr">texto lido: '+readTxt.replace(/</g,'&lt;').slice(0,120)+'</span>'):''}
     <br><br>Alinha o número dentro da faixa, aproxima mais e com boa luz.</div>`;
   ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanRetry">Tentar de novo</button>`;
