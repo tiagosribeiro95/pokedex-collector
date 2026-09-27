@@ -286,6 +286,9 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .setrow2{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.08)}
 .setrow2 b{font-size:14px;font-weight:600}
 .setrow2 span{font-size:11px;color:#e6b53f;font-weight:700;flex:0 0 auto}
+.scan-numrow{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.scan-numrow label{font-size:12px;color:#c8ccd6;width:54px;flex:0 0 auto}
+.scan-numrow input{flex:1;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:16px}
 </style>
 </head>
 <body>
@@ -1038,27 +1041,32 @@ async function fetchSetsList(){
   }catch(e){ _setsList=[]; }
   return _setsList;
 }
-// fallback: read the number but not the set → user picks the set, then we identify
-async function showSetChooser(ov, num, retry, close){
+// bulletproof step: number is editable (pre-filled from OCR) + pick the set → identify
+async function showSetChooser(ov, num, retry, close, strip){
   const stage=ov.querySelector('.scan-stage'); stage.style.flex='1';
   stage.innerHTML=`<div class="scan-chooser">
-    <div class="scan-chooser-h">Li o número <b>${num}</b>, mas não reconheci o set.<br>De que set é esta carta?</div>
-    <div class="cardsearch pk" style="margin:0 0 10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-      <input id="setSearch" type="search" placeholder="Procurar set (ex. 30th, 151, Mega)…" autocomplete="off"></div>
+    <div class="scan-chooser-h">Confirma o <b>número</b> e escolhe o <b>set</b> desta carta.</div>
+    ${strip?('<img src="'+strip+'" alt="" style="max-width:66%;align-self:center;border-radius:8px;margin-bottom:10px">'):''}
+    <div class="scan-numrow"><label>Número</label><input id="scanNum" inputmode="numeric" value="${(num||'').replace(/"/g,'')}" placeholder="ex. 30"></div>
+    <div class="cardsearch pk" style="margin:8px 0 8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="setSearch" type="search" placeholder="Procurar set (30th, 151, Mega, Surging…)…" autocomplete="off"></div>
     <div id="setList" class="setlist"></div></div>`;
   const acts=ov.querySelector('.scan-actions'); if(acts) acts.innerHTML=`<button class="scan-capture" id="scanRetry3">Voltar a ler</button>`;
   const rb=ov.querySelector('#scanRetry3'); if(rb) rb.onclick=retry;
   const sets=await fetchSetsList();
   const listEl=stage.querySelector('#setList');
+  const numEl=stage.querySelector('#scanNum');
   const draw=q=>{
     const ql=(q||'').toLowerCase();
-    const filt=(ql?sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql)):sets).slice(0,50);
+    const filt=(ql?sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql)):sets).slice(0,60);
     listEl.innerHTML=filt.map(s=>`<button class="setrow2" data-sid="${s.id}"><b>${s.name}</b>${s.code?'<span>'+s.code+'</span>':''}</button>`).join('')||'<div style="color:#889;padding:10px">Nada encontrado.</div>';
     listEl.querySelectorAll('[data-sid]').forEach(b=> b.onclick=async()=>{
+      const n=(numEl.value||'').trim();
+      if(!n){ toast('Escreve o número da carta'); numEl.focus(); return; }
       listEl.innerHTML='<div class="scan-msg" style="padding:24px"><div class="spin" style="margin:0 auto"></div></div>';
-      const id=await findCardId(b.dataset.sid, num); const card=id?await fetchCardFull(id):null;
+      const id=await findCardId(b.dataset.sid, n); const card=id?await fetchCardFull(id):null;
       if(card) showScanCard(ov, card, retry, close);
-      else { toast('Não encontrei o nº '+num+' nesse set'); draw(q); }
+      else { toast('Não encontrei o nº '+n+' nesse set — confirma o número'); draw(q); }
     });
   };
   draw('');
@@ -1130,15 +1138,7 @@ async function handleScanResult(ov, parsed, close, strip){
     for(const setId of setIds){ const id=await findCardId(setId, parsed.num); if(id){ card=await fetchCardFull(id); if(card) break; } }
     if(card){ return showScanCard(ov, card, retry, close); }
   }
-  if(parsed.num){ return showSetChooser(ov, parsed.num, retry, close); }   // leu o número → escolher set
-  const readTxt = (parsed.raw||'').replace(/\s+/g,' ').trim();
-  stage.innerHTML=`<div class="scan-msg">
-    ${strip?('<img src="'+strip+'" alt="" style="max-width:82%;border-radius:8px;margin-bottom:14px">'):''}
-    Não consegui ler o número.
-    ${readTxt?('<br><span class="scan-ocr">texto lido: '+readTxt.replace(/</g,'&lt;').slice(0,120)+'</span>'):''}
-    <br><br>Alinha o número dentro da faixa, aproxima mais e com boa luz.</div>`;
-  ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanRetry">Tentar de novo</button>`;
-  ov.querySelector('#scanRetry').onclick=retry;
+  return showSetChooser(ov, parsed.num, retry, close, strip);   // sempre: número editável + escolher set (à prova de falhas)
 }
 function showScanCard(ov, card, retry, close){
   const n=(card.dexId&&card.dexId[0])||null;
