@@ -261,8 +261,8 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .scan-top .scan-close{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;font-size:17px}
 .scan-stage{flex:1;position:relative;overflow:hidden;background:#000;display:grid;place-items:center;min-height:0}
 .scan-stage video{width:100%;height:100%;object-fit:cover}
-.scan-frame{position:absolute;left:7%;right:7%;top:14%;bottom:14%;border:2px solid rgba(255,255,255,.85);border-radius:14px;box-shadow:0 0 0 100vmax rgba(0,0,0,.4);pointer-events:none}
-.scan-frame::after{content:"nº + código aqui";position:absolute;left:0;right:0;bottom:-26px;text-align:center;font-size:11px;color:#c8ccd6}
+.scan-band{position:absolute;left:6%;right:6%;top:calc(50% - 34px);height:68px;border:2px solid var(--accent);border-radius:10px;box-shadow:0 0 0 100vmax rgba(0,0,0,.5);pointer-events:none}
+.scan-band::after{content:"número + código aqui";position:absolute;left:0;right:0;top:-22px;text-align:center;font-size:11px;font-weight:700;color:#e6b53f}
 .scan-hint{padding:12px 20px;text-align:center;font-size:13px;color:#c8ccd6}
 .scan-actions{padding:8px 16px 18px;display:flex;justify-content:center}
 .scan-capture{padding:14px 32px;border-radius:99px;background:#fff;color:#111;font-weight:700;font-size:15px;font-family:Sora}
@@ -1024,9 +1024,9 @@ async function openScan(){
   const ov=document.createElement('div'); ov.className='scan-overlay';
   ov.innerHTML=`
     <div class="scan-top"><button class="scan-close" aria-label="Fechar">✕</button><span>Digitalizar carta</span></div>
-    <div class="scan-stage"><video autoplay playsinline muted></video><div class="scan-frame"></div></div>
-    <div class="scan-hint">Enquadra a carta e foca o <b>canto de baixo</b> — o número (ex. 019/165) e o código do set (ex. MEW).</div>
-    <div class="scan-actions"><button class="scan-capture">Capturar</button></div>`;
+    <div class="scan-stage"><video autoplay playsinline muted></video><div class="scan-band"></div></div>
+    <div class="scan-hint">Aproxima a carta e <b>alinha só o número</b> (ex. 030/198 · OBF) dentro da faixa dourada. Boa luz ajuda muito.</div>
+    <div class="scan-actions"><button class="scan-capture">Ler número</button></div>`;
   document.body.appendChild(ov);
   const video=ov.querySelector('video');
   const stopCam=()=>{ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } };
@@ -1034,31 +1034,48 @@ async function openScan(){
   ov.querySelector('.scan-close').onclick=close;
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    video.srcObject=stream;
+    video.srcObject=stream; await video.play().catch(()=>{});
   }catch(e){
-    ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg">Não consegui aceder à câmara.<br><br>Confirma a permissão da câmara para a app e que estás em https.</div>`;
+    ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg">Não consegui aceder à câmara.<br><br>Confirma a permissão da câmara para a app.</div>`;
     ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanCloseBtn">Fechar</button>`;
     ov.querySelector('#scanCloseBtn').onclick=close; return;
   }
   const capBtn=ov.querySelector('.scan-capture');
   capBtn.onclick=async()=>{
-    const vw=video.videoWidth, vh=video.videoHeight; if(!vw){ return; }
+    const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return;
     capBtn.disabled=true;
-    const cv=document.createElement('canvas'); cv.width=vw; cv.height=vh; const cx=cv.getContext('2d'); cx.drawImage(video,0,0,vw,vh);
-    // tons de cinza + contraste ajudam o OCR a ler o número/código pequenos
-    try{ const im=cx.getImageData(0,0,vw,vh); const d=im.data;
-      for(let i=0;i<d.length;i+=4){ let g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2]; g=(g-128)*1.4+128; d[i]=d[i+1]=d[i+2]=(g<0?0:g>255?255:g); }
-      cx.putImageData(im,0,0);
+    // crop just the gold band from the video (object-fit:cover mapping) and upscale 4x
+    const stage=ov.querySelector('.scan-stage'), band=ov.querySelector('.scan-band');
+    const sr=stage.getBoundingClientRect(), br=band.getBoundingClientRect();
+    const scale=Math.max(sr.width/vw, sr.height/vh);
+    const offX=(vw*scale - sr.width)/2, offY=(vh*scale - sr.height)/2;
+    let vx=(br.left - sr.left + offX)/scale, vy=(br.top - sr.top + offY)/scale;
+    let vwid=br.width/scale, vhei=br.height/scale;
+    vx=Math.max(0,vx); vy=Math.max(0,vy); vwid=Math.min(vwid, vw-vx); vhei=Math.min(vhei, vh-vy);
+    const up=4;
+    const oc=document.createElement('canvas'); oc.width=Math.round(vwid*up); oc.height=Math.round(vhei*up);
+    const octx=oc.getContext('2d');
+    octx.drawImage(video, vx, vy, vwid, vhei, 0, 0, oc.width, oc.height);
+    try{ const im=octx.getImageData(0,0,oc.width,oc.height); const d=im.data;
+      for(let i=0;i<d.length;i+=4){ let g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2]; g=(g-128)*1.5+128; d[i]=d[i+1]=d[i+2]=(g<0?0:g>255?255:g); }
+      octx.putImageData(im,0,0);
     }catch(e){}
+    const strip=oc.toDataURL('image/jpeg',0.7);
     stopCam();
-    ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>A ler a carta…<br><small>(a 1ª vez descarrega o motor de OCR — pode demorar)</small></div>`;
+    const stg=ov.querySelector('.scan-stage'); stg.style.flex='0 0 auto';
+    stg.innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>A ler o número…<br><small>(a 1ª vez descarrega o motor de OCR — aguarda)</small></div>`;
     ov.querySelector('.scan-actions').innerHTML='';
-    let text='';
-    try{ await loadTesseract(); const {data}=await Tesseract.recognize(cv,'eng'); text=data.text||''; }catch(e){ text=''; }
-    handleScanResult(ov, parseScan(text), close);
+    let engineOk=true; try{ await loadTesseract(); }catch(e){ engineOk=false; }
+    if(!engineOk){
+      stg.innerHTML=`<div class="scan-msg">Não consegui carregar o motor de OCR.<br><br>Verifica a internet e tenta outra vez.</div>`;
+      ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanRetry2">Tentar de novo</button>`;
+      ov.querySelector('#scanRetry2').onclick=()=>{ ov.remove(); openScan(); }; return;
+    }
+    let text=''; try{ const {data}=await Tesseract.recognize(oc,'eng'); text=data.text||''; }catch(e){ text=''; }
+    handleScanResult(ov, parseScan(text), close, strip);
   };
 }
-async function handleScanResult(ov, parsed, close){
+async function handleScanResult(ov, parsed, close, strip){
   const stage=ov.querySelector('.scan-stage');
   const retry=()=>{ ov.remove(); openScan(); };
   if(parsed.code && parsed.num){
@@ -1068,7 +1085,12 @@ async function handleScanResult(ov, parsed, close){
     for(const setId of setIds){ const id=await findCardId(setId, parsed.num); if(id){ card=await fetchCardFull(id); if(card) break; } }
     if(card){ return showScanCard(ov, card, retry, close); }
   }
-  stage.innerHTML=`<div class="scan-msg">Não consegui identificar a carta.<br><br>${parsed.raw?('Li: <span class="scan-ocr">'+parsed.raw.replace(/</g,'&lt;').slice(0,140)+'</span><br><br>'):''}Tenta com mais luz e o canto do número/código bem enquadrado.</div>`;
+  const readTxt = (parsed.raw||'').replace(/\s+/g,' ').trim();
+  stage.innerHTML=`<div class="scan-msg">
+    ${strip?('<img src="'+strip+'" alt="" style="max-width:82%;border-radius:8px;margin-bottom:14px">'):''}
+    ${parsed.num?('Li o número <b>'+parsed.num+'</b>'+(parsed.code?' e código <b>'+parsed.code+'</b>':' mas não reconheci o código do set')+'.'):'Não consegui ler o número.'}
+    ${readTxt?('<br><span class="scan-ocr">texto lido: '+readTxt.replace(/</g,'&lt;').slice(0,120)+'</span>'):''}
+    <br><br>Alinha o número dentro da faixa, aproxima mais e com boa luz.</div>`;
   ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanRetry">Tentar de novo</button>`;
   ov.querySelector('#scanRetry').onclick=retry;
 }
