@@ -1,5 +1,5 @@
 /* Pokédex Collector — service worker (app shell offline) */
-const CACHE = 'pdc-v4';
+const CACHE = 'pdc-v6';
 const SHELL = ['./', 'index.html', 'national.json', 'regional.json', 'sets.json', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 

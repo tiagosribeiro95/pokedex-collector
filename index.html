@@ -227,6 +227,13 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .pkprice{flex:0 0 auto;font-family:Sora;font-weight:700;font-size:14px;text-align:right;min-width:58px}
 .pkprice .usd{color:var(--muted);font-weight:600}
 .artdot{color:var(--accent-ink)}
+.lchip{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.3px;padding:1px 4px;border-radius:4px;background:var(--surface-3);color:var(--muted);vertical-align:middle}
+.lchip.l-ja{background:#f8dcdc;color:#a52222}
+.lchip.l-zhtw{background:#fdeccb;color:#875200}
+.lchip.l-ko{background:#dde4fb;color:#2536a0}
+:root[data-theme="dark"] .lchip.l-ja,:root:not([data-theme="light"]) .lchip.l-ja{background:#4a2020;color:#f4b4b4}
+:root[data-theme="dark"] .lchip.l-zhtw,:root:not([data-theme="light"]) .lchip.l-zhtw{background:#453214;color:#f0cd88}
+:root[data-theme="dark"] .lchip.l-ko,:root:not([data-theme="light"]) .lchip.l-ko{background:#232f5a;color:#b6c4f5}
 
 /* ---------- toast / loader ---------- */
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0));transform:translateX(-50%) translateY(20px);z-index:80;
@@ -334,40 +341,76 @@ async function idbSet(k,v){ try{ const db=await idb(); const t=db.transaction('k
 const DAY = 864e5;
 
 /* ============================ api ============================ */
+// English (GraphQL) is the Western superset; Japanese/Chinese/Korean are DISTINCT cards (REST per language).
+const LANGS_EXTRA = ['ja','zh-tw','ko'];
+const LANG_CHIP = {en:'EN', ja:'JP', 'zh-tw':'ZH', ko:'KR', pt:'PT', fr:'FR', de:'DE', es:'ES', it:'IT'};
+const REST_LANG = lang => `https://api.tcgdex.net/v2/${lang||'en'}/cards/`;
+function langChip(c){ return (c.lang && c.lang!=='en') ? ` <span class="lchip l-${c.lang.replace('-','')}">${LANG_CHIP[c.lang]||c.lang.toUpperCase()}</span>` : ''; }
+
 async function fetchDexCards(n){
-  const key = 'cards2:'+n;
+  const key = 'cards4:'+n;
   const c = await idbGet(key);
   if (c && (Date.now()-c.ts) < 14*DAY) return c.cards;
   const query = `{ cards(filters:{dexId:${n}}) { id localId name rarity image suffix variants{holo reverse normal firstEdition} set{id name cardCount{official total}} } }`;
-  const r = await fetch(GQL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})});
-  if(!r.ok) throw new Error('network');
-  const j = await r.json();
-  if(j.errors) throw new Error('api');
-  const cards = j.data.cards || [];
+  const results = await Promise.all([
+    fetch(GQL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})}).then(r=>r.json()),
+    ...LANGS_EXTRA.map(L => fetch(`https://api.tcgdex.net/v2/${L}/cards?dexId=eq:${n}`).then(r=> r.ok?r.json():[]).catch(()=>[]))
+  ]);
+  const en = results[0];
+  if(en.errors || !en.data) throw new Error('api');
+  const cards = (en.data.cards || []).map(c => ({...c, lang:'en'}));
+  const seen = new Set(cards.map(c=>c.id));           // dedupe: zh-tw/ko reuse Japanese set ids
+  LANGS_EXTRA.forEach((L,i)=>{
+    (results[i+1]||[]).forEach(b=>{
+      if(!b || !b.id || seen.has(b.id)) return;
+      seen.add(b.id);
+      cards.push({ id:b.id, localId:b.localId, name:b.name, image:b.image||null, lang:L,
+        rarity:null, suffix:null, variants:{}, set:{ id:(b.id||'').split('-')[0], name:'', cardCount:{} } });
+    });
+  });
   idbSet(key, {cards, ts:Date.now()});
   return cards;
 }
-async function fetchPrice(id){
-  const key = 'price:'+id;
+// one detail fetch → price (+ rarity/set for non-English cards whose brief list was thin)
+async function fetchDetail(card){
+  const id = typeof card==='string' ? card : card.id;
+  const lang = (typeof card==='object' && card.lang) || 'en';
+  const key = 'det:'+id;
   const c = await idbGet(key);
   if (c && (Date.now()-c.ts) < 3*DAY) return c.val;
-  let val = null;
+  let val = {price:null};
   try{
-    const r = await fetch(REST+id);
+    const r = await fetch(REST_LANG(lang)+id);
     if(r.ok){
       const j = await r.json();
       const cm = j.pricing && j.pricing.cardmarket;
       const tp = j.pricing && j.pricing.tcgplayer;
+      let price=null;
       if(cm && (cm.trend||cm.avg||cm.low)!=null){
-        val = {value: cm.trend ?? cm.avg ?? cm.low, cur:'EUR', low:cm.low, avg:cm.avg, trend:cm.trend, updated:cm.updated};
+        price = {value: cm.trend ?? cm.avg ?? cm.low, cur:'EUR', low:cm.low, avg:cm.avg, trend:cm.trend, updated:cm.updated};
       } else if(tp){
         let mp=null; for(const k in tp){ if(tp[k] && typeof tp[k]==='object' && tp[k].marketPrice!=null){ mp=tp[k].marketPrice; break; } }
-        if(mp!=null) val = {value:mp, cur:'USD'};
+        if(mp!=null) price = {value:mp, cur:'USD'};
       }
+      val = {price, rarity:j.rarity||null, setName:(j.set&&j.set.name)||'', setTotal:(j.set&&j.set.cardCount&&j.set.cardCount.official)||null};
     }
   }catch(e){}
   idbSet(key, {val, ts:Date.now()});
   return val;
+}
+function enrichCard(c, d){
+  if(!d || c.lang==='en') return false;
+  let changed=false;
+  if(d.rarity && c.rarity!==d.rarity){ c.rarity=d.rarity; changed=true; }
+  if(d.setName && c.set.name!==d.setName){ c.set.name=d.setName; changed=true; }
+  if(d.setTotal && (!c.set.cardCount||c.set.cardCount.official!==d.setTotal)){ c.set.cardCount={official:d.setTotal, total:d.setTotal}; changed=true; }
+  return changed;
+}
+function refreshCardTile(c){
+  const el=document.querySelector(`.ccard[data-id="${CSS.escape(c.id)}"]`); if(!el) return;
+  const rar=el.querySelector('.rar'); if(rar) rar.textContent=c.rarity||'—';
+  const cset=el.querySelector('.cset'); if(cset){ const no=cardNo(c); cset.innerHTML=`${c.set.name||''}${no?` · <span class="tnum">${no}</span>`:''}${langChip(c)}`; }
+  if(isArtRarity(c.rarity)){ const tb=el.querySelector('.topbadges'); if(tb && !tb.querySelector('.ribbon.art')) tb.insertAdjacentHTML('afterbegin','<span class="ribbon art">★ Art</span>'); }
 }
 // Best-effort image fallback for cards TCGdex has no artwork for (via pokemontcg.io).
 // Cardmarket has no image API and blocks hotlinking, so it can't be used here.
@@ -629,7 +672,7 @@ function cardHTML(c, ownedIds, topId){
       <div class="topbadges">${art?'<span class="ribbon art">★ Art</span>':'<span></span>'}${c.id===topId?'<span class="ribbon top">💎 TOP €</span>':''}</div>
     </div>
     <div class="info">
-      <div class="cset">${c.set.name}${no?` · <span class="tnum">${no}</span>`:''}</div>
+      <div class="cset">${c.set.name}${no?` · <span class="tnum">${no}</span>`:''}${langChip(c)}</div>
       <div class="cname">${c.name}</div>
       <div class="rar">${c.rarity||'—'}</div>
       <div class="crow"><span class="cprice">${priceHTML}</span>
@@ -693,8 +736,10 @@ async function ensurePrices(mon, sid, cards){
     if(note) note.textContent = `preços 0/${total}…`;
     await pool(need, async c=>{
       if(token!==priceToken) return;
-      const p = await fetchPrice(c.id);
-      priceMap[c.id] = p || {value:null};
+      const d = await fetchDetail(c);
+      const p = (d&&d.price)||{value:null};
+      priceMap[c.id] = p;
+      if(enrichCard(c,d)) refreshCardTile(c);
       done++;
       if(token!==priceToken) return;
       const cell = document.querySelector(`.ccard[data-id="${CSS.escape(c.id)}"] .cprice`);
@@ -710,11 +755,12 @@ async function ensurePrices(mon, sid, cards){
 function reorderByValue(sid, cards){
   const grid = document.getElementById('cgrid'); if(!grid) return;
   const sorted = sortCards(cards.slice());
-  const nodes = {}; grid.querySelectorAll('.ccard').forEach(n=> nodes[n.dataset.id]=n);
-  sorted.forEach(c=>{ const n=nodes[c.id]; if(n) grid.appendChild(n); });
+  const frag = document.createDocumentFragment();
+  sorted.forEach(c=>{ const n = grid.querySelector('.ccard[data-id="'+CSS.escape(c.id)+'"]'); if(n) frag.appendChild(n); });
+  grid.appendChild(frag);
   grid.querySelectorAll('.ribbon.top').forEach(x=>x.remove());
   const best = bestValue(sorted);
-  if(best && nodes[best.id]){ const tb = nodes[best.id].querySelector('.topbadges'); if(tb) tb.insertAdjacentHTML('beforeend','<span class="ribbon top">💎 TOP €</span>'); }
+  if(best){ const n = grid.querySelector('.ccard[data-id="'+CSS.escape(best.id)+'"]'); if(n){ const tb = n.querySelector('.topbadges'); if(tb) tb.insertAdjacentHTML('beforeend','<span class="ribbon top">💎 TOP €</span>'); } }
 }
 function showUpgradeHint(sid, cards){
   const own = collection[sid];
@@ -838,7 +884,7 @@ function pkRow(c){
   return `<button class="pkrow" data-pk="${c.id}">
     <div class="pkimg">${c.image?`<img loading="lazy" decoding="async" src="${cardImg(c.image,'low')}" alt="" onerror="this.style.visibility='hidden'">`:'<span>—</span>'}</div>
     <div class="pkmeta"><div class="pknm">${art?'<span class="artdot">★</span> ':''}${c.name}</div>
-      <div class="pkset">${c.set.name}${no?' · '+no:''}${code?' · '+code:''}</div>
+      <div class="pkset">${c.set.name}${no?' · '+no:''}${code?' · '+code:''}${langChip(c)}</div>
       <div class="pkrar">${c.rarity||''}</div></div>
     <div class="pkprice">${priceHTML}</div>
   </button>`;
@@ -847,9 +893,14 @@ async function pkPrices(list, listEl){
   const need=list.filter(c=>priceMap[c.id]===undefined);
   if(!need.length) return;
   await pool(need, async c=>{
-    const p=await fetchPrice(c.id); priceMap[c.id]=p||{value:null};
-    const cell=listEl.querySelector(`.pkrow[data-pk="${CSS.escape(c.id)}"] .pkprice`);
-    if(cell) cell.innerHTML=`<b class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</b>`;
+    const d=await fetchDetail(c); const p=(d&&d.price)||{value:null}; priceMap[c.id]=p;
+    enrichCard(c,d);
+    const row=listEl.querySelector(`.pkrow[data-pk="${CSS.escape(c.id)}"]`);
+    if(row){
+      const pc=row.querySelector('.pkprice'); if(pc) pc.innerHTML=`<b class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</b>`;
+      const rr=row.querySelector('.pkrar'); if(rr) rr.textContent=c.rarity||'';
+      const st=row.querySelector('.pkset'); if(st){ const no=cardNo(c); st.innerHTML=`${c.set.name||''}${no?' · '+no:''}${langChip(c)}`; }
+    }
   }, 6);
 }
 document.getElementById('menuBtn').onclick = ()=>{
