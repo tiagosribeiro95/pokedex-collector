@@ -214,6 +214,8 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .rbadge.soft{background:var(--surface-3);color:var(--faint)}
 .tile.reg-tile{background:linear-gradient(180deg,color-mix(in srgb,var(--accent-soft) 55%,var(--surface)),var(--surface))}
 .cardsearch.pk{margin:4px 0 10px}
+.pk-current{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:9px 12px;margin-bottom:10px;font-size:13px}
+.pk-current b{color:var(--accent-ink)}
 #pkList{max-height:54vh;overflow:auto;margin:0 -4px;padding:0 4px}
 .pklist{display:flex;flex-direction:column;gap:7px}
 .pkrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:8px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
@@ -247,6 +249,35 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .errbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);margin-top:16px}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* scan */
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0));z-index:40;display:flex;align-items:center;gap:8px;
+  padding:13px 17px;border-radius:99px;background:var(--accent);color:#231a04;font-weight:700;font-size:14px;font-family:Sora;
+  box-shadow:0 6px 20px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.16)}
+.fab svg{width:20px;height:20px}
+.fab:active{transform:scale(.96)}
+.scan-overlay{position:fixed;inset:0;z-index:90;background:#0b0d12;color:#fff;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.scan-top{display:flex;align-items:center;gap:12px;padding:12px 16px;font-family:Sora;font-weight:600;font-size:16px}
+.scan-top .scan-close{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;font-size:17px}
+.scan-stage{flex:1;position:relative;overflow:hidden;background:#000;display:grid;place-items:center;min-height:0}
+.scan-stage video{width:100%;height:100%;object-fit:cover}
+.scan-frame{position:absolute;left:7%;right:7%;top:14%;bottom:14%;border:2px solid rgba(255,255,255,.85);border-radius:14px;box-shadow:0 0 0 100vmax rgba(0,0,0,.4);pointer-events:none}
+.scan-frame::after{content:"nº + código aqui";position:absolute;left:0;right:0;bottom:-26px;text-align:center;font-size:11px;color:#c8ccd6}
+.scan-hint{padding:12px 20px;text-align:center;font-size:13px;color:#c8ccd6}
+.scan-actions{padding:8px 16px 18px;display:flex;justify-content:center}
+.scan-capture{padding:14px 32px;border-radius:99px;background:#fff;color:#111;font-weight:700;font-size:15px;font-family:Sora}
+.scan-capture:disabled{opacity:.5}
+.scan-msg{padding:20px;text-align:center;color:#c8ccd6;font-size:14px}
+.scan-result{padding:16px 20px 22px;background:#141821;border-top:1px solid #232a36}
+.scan-result h4{font-family:Sora;font-size:13px;margin:0 0 12px;color:#aab;font-weight:600}
+.scan-card{display:flex;gap:14px;align-items:center}
+.scan-card img{width:78px;border-radius:8px;flex:0 0 auto}
+.scan-card .m b{font-size:16px;font-family:Sora}
+.scan-card .m span{display:block;font-size:12px;color:#aab;margin-top:2px}
+.scan-card .m .pr{color:var(--accent);font-weight:700;margin-top:4px}
+.scan-res-actions{display:flex;gap:10px;margin-top:14px}
+.scan-res-actions .btn{flex:1;justify-content:center;text-align:center;padding:13px}
+.scan-ocr{font-size:11px;color:#788;margin-top:10px;word-break:break-word}
 </style>
 </head>
 <body>
@@ -292,6 +323,11 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
   <div id="homeView" class="wrap"><div class="grid" id="grid"></div><div id="gridEmpty" class="empty" hidden></div></div>
   <div id="detailView" class="detail" hidden></div>
 </main>
+
+<button class="fab" id="scanFab" aria-label="Digitalizar carta">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 012-2h1l1.2-1.6A2 2 0 018.8 4.5h6.4a2 2 0 011.6.9L18 7h1a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+  <span>Digitalizar</span>
+</button>
 
 <div class="toast" id="toast" hidden></div>
 
@@ -527,6 +563,7 @@ function showView(which){
   document.getElementById('homeView').hidden = which!=='home';
   document.getElementById('homeControls').hidden = which!=='home';
   document.getElementById('detailView').hidden = which!=='detail';
+  const fab=document.getElementById('scanFab'); if(fab) fab.hidden = which!=='home';
   document.getElementById('brandtxt').textContent = which==='home' ? 'Pokédex Collector' : '';
 }
 function openDetail(n, pick, form){
@@ -811,11 +848,8 @@ function toast(msg, undo){
 /* ============================ grid interactions ============================ */
 document.getElementById('grid').addEventListener('click', e=>{
   const chk = e.target.closest('[data-check]');
-  if(chk){ e.stopPropagation(); const n=+chk.dataset.check; const region=chk.dataset.form||null; const sid=slotId(n,region);
-    if(collection[sid]){ // unmark
-      const removed = collection[sid]; delete collection[sid]; saveCollection(); renderGrid();
-      toast('Removido', ()=>{ collection[sid]=removed; saveCollection(); renderGrid(); toast('Reposto ✔'); });
-    } else { openCardPicker(NATIONAL.find(m=>m.n===n), region||'base'); } // asks which card, stays on list
+  if(chk){ e.stopPropagation(); const n=+chk.dataset.check; const region=chk.dataset.form||null;
+    openCardPicker(NATIONAL.find(m=>m.n===n), region||'base');   // escolher / trocar / remover — tudo aqui
     return;
   }
   const tile = e.target.closest('.tile'); if(tile) openDetail(+tile.dataset.n, false, tile.dataset.form||null);
@@ -846,15 +880,20 @@ function openSheet(html){
 async function openCardPicker(mon, form){
   if(!mon) return;
   const label = form==='base' ? mon.name : `${FORM_LABEL[form]||''} ${mon.name}`.trim();
+  const sid = slotId(mon.n, form);
+  const owned = collection[sid];
+  const current = owned ? `<div class="pk-current"><span>${owned.cardId ? ('Tens: <b>'+(owned.name||'?')+'</b>'+(owned.setName?' · '+owned.setName:'')) : 'Marcado como tido (sem carta)'}</span><button class="btn sm danger" id="pkRemove">Remover</button></div>` : '';
   const {scrim, close} = openSheet(`
-    <h3>Que carta tens?</h3>
+    <h3>${owned ? 'Trocar carta' : 'Que carta tens?'}</h3>
     <p class="s">${label} · #${String(mon.n).padStart(4,'0')}</p>
+    ${current}
     <div class="cardsearch pk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
       <input id="pkSearch" type="search" placeholder="nome, nº (019/165) ou código (MEW)…" autocomplete="off" enterkeyhint="search"></div>
     <div id="pkList"><div class="loader" style="padding:34px 0"><div class="spin"></div><span>A carregar cartas…</span></div></div>
-    <button class="btn ghost" id="pkNoCard" style="width:100%;margin-top:10px;justify-content:center;text-align:center">Marcar como tido (escolher carta depois)</button>
+    <button class="btn ghost" id="pkNoCard" style="width:100%;margin-top:10px;justify-content:center;text-align:center">${owned?'Marcar sem carta':'Marcar como tido (escolher carta depois)'}</button>
   `);
-  scrim.querySelector('#pkNoCard').onclick=()=>{ collection[slotId(mon.n,form)]={cardId:null,addedAt:Date.now()}; saveCollection(); renderGrid(); close(); toast('Marcado ✔'); };
+  scrim.querySelector('#pkNoCard').onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); renderGrid(); close(); toast('Marcado ✔'); };
+  const rmBtn=scrim.querySelector('#pkRemove'); if(rmBtn) rmBtn.onclick=()=>{ delete collection[sid]; saveCollection(); renderGrid(); close(); toast('Removido'); };
   const listEl=scrim.querySelector('#pkList');
   let cards=[];
   try{
@@ -950,12 +989,111 @@ function applyTheme(){
   if(meta) meta.content = dark ? '#14161c' : '#f3f4f7';
 }
 
+/* ============================ scan (camera + OCR) ============================ */
+let _codeToSet=null;
+function codeToSet(){ if(_codeToSet) return _codeToSet; _codeToSet={}; for(const sid in SETCODES){ const c=(SETCODES[sid]||'').toUpperCase(); if(c && !_codeToSet[c]) _codeToSet[c]=sid; } return _codeToSet; }
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload=res; s.onerror=()=>rej(new Error('cdn')); document.head.appendChild(s); });
+}
+function parseScan(text){
+  const up=(text||'').toUpperCase();
+  const numM=up.match(/(\d{1,3})\s*\/\s*(\d{1,3})/);
+  const codes=codeToSet();
+  const tokens=up.split(/[^A-Z0-9]+/).filter(Boolean);
+  let code=null;
+  for(const t of tokens){ if(t.length>=2 && t.length<=5 && !/^\d+$/.test(t) && codes[t]){ code=t; break; } }
+  return {num: numM?numM[1]:null, totalStr: numM?numM[2]:null, code, raw:(text||'').trim()};
+}
+async function findCardId(setId, num){
+  try{ const r=await fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`); if(!r.ok) return null;
+    const set=await r.json(); const cards=set.cards||[]; const t=String(parseInt(num,10));
+    const f=cards.find(c=>String(parseInt(c.localId,10))===t) || cards.find(c=>c.localId===num);
+    return f?f.id:null;
+  }catch(e){ return null; }
+}
+async function fetchCardFull(id){ try{ const r=await fetch(`https://api.tcgdex.net/v2/en/cards/${id}`); return r.ok?r.json():null; }catch(e){ return null; } }
+async function openScan(){
+  let stream=null;
+  const ov=document.createElement('div'); ov.className='scan-overlay';
+  ov.innerHTML=`
+    <div class="scan-top"><button class="scan-close" aria-label="Fechar">✕</button><span>Digitalizar carta</span></div>
+    <div class="scan-stage"><video autoplay playsinline muted></video><div class="scan-frame"></div></div>
+    <div class="scan-hint">Enquadra a carta e foca o <b>canto de baixo</b> — o número (ex. 019/165) e o código do set (ex. MEW).</div>
+    <div class="scan-actions"><button class="scan-capture">Capturar</button></div>`;
+  document.body.appendChild(ov);
+  const video=ov.querySelector('video');
+  const stopCam=()=>{ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } };
+  const close=()=>{ stopCam(); ov.remove(); };
+  ov.querySelector('.scan-close').onclick=close;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    video.srcObject=stream;
+  }catch(e){
+    ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg">Não consegui aceder à câmara.<br><br>Confirma a permissão da câmara para a app e que estás em https.</div>`;
+    ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanCloseBtn">Fechar</button>`;
+    ov.querySelector('#scanCloseBtn').onclick=close; return;
+  }
+  const capBtn=ov.querySelector('.scan-capture');
+  capBtn.onclick=async()=>{
+    const vw=video.videoWidth, vh=video.videoHeight; if(!vw){ return; }
+    capBtn.disabled=true;
+    const cv=document.createElement('canvas'); cv.width=vw; cv.height=vh; cv.getContext('2d').drawImage(video,0,0,vw,vh);
+    stopCam();
+    ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>A ler a carta…<br><small>(a 1ª vez descarrega o motor de OCR — pode demorar)</small></div>`;
+    ov.querySelector('.scan-actions').innerHTML='';
+    let text='';
+    try{ await loadTesseract(); const {data}=await Tesseract.recognize(cv,'eng'); text=data.text||''; }catch(e){ text=''; }
+    handleScanResult(ov, parseScan(text), close);
+  };
+}
+async function handleScanResult(ov, parsed, close){
+  const stage=ov.querySelector('.scan-stage');
+  const retry=()=>{ ov.remove(); openScan(); };
+  if(parsed.code && parsed.num){
+    stage.innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>Encontrei <b>${parsed.code} ${parsed.num}</b> — a procurar…</div>`;
+    const setId=codeToSet()[parsed.code];
+    const id=setId?await findCardId(setId, parsed.num):null;
+    const card=id?await fetchCardFull(id):null;
+    if(card){ return showScanCard(ov, card, retry, close); }
+  }
+  stage.innerHTML=`<div class="scan-msg">Não consegui identificar a carta.<br><br>${parsed.raw?('Li: <span class="scan-ocr">'+parsed.raw.replace(/</g,'&lt;').slice(0,140)+'</span><br><br>'):''}Tenta com mais luz e o canto do número/código bem enquadrado.</div>`;
+  ov.querySelector('.scan-actions').innerHTML=`<button class="scan-capture" id="scanRetry">Tentar de novo</button>`;
+  ov.querySelector('#scanRetry').onclick=retry;
+}
+function showScanCard(ov, card, retry, close){
+  const n=(card.dexId&&card.dexId[0])||null;
+  const mon=n?NATIONAL.find(m=>m.n===n):null;
+  const cm=card.pricing&&card.pricing.cardmarket;
+  const price=cm?(cm.trend??cm.avg??cm.low):null;
+  const img=card.image?card.image+'/low.webp':PLACEHOLDER;
+  const total=(card.set&&card.set.cardCount&&card.set.cardCount.official)?('/'+card.set.cardCount.official):'';
+  const stage=ov.querySelector('.scan-stage'); stage.style.flex='0 0 auto'; stage.innerHTML='';
+  const hint=ov.querySelector('.scan-hint'); if(hint) hint.remove();
+  const acts=ov.querySelector('.scan-actions'); if(acts) acts.remove();
+  const res=document.createElement('div'); res.className='scan-result';
+  res.innerHTML=`<h4>É esta a carta?</h4>
+    <div class="scan-card"><img src="${img}" alt="" onerror="this.src='${PLACEHOLDER}'">
+      <div class="m"><b>${card.name}</b><span>${(card.set&&card.set.name)||''} · ${card.localId||''}${total}${card.rarity?' · '+card.rarity:''}</span>
+        <span>${mon?('Pokémon: #'+String(n).padStart(4,'0')+' '+mon.name):'(sem Pokémon associado)'}</span>
+        ${price!=null?('<div class="pr">€'+price.toFixed(2)+'</div>'):''}</div></div>
+    <div class="scan-res-actions"><button class="btn" id="scanNo">Não / outra</button><button class="btn gold" id="scanYes" ${mon?'':'disabled'}>Sim, adicionar</button></div>`;
+  ov.appendChild(res);
+  res.querySelector('#scanNo').onclick=retry;
+  res.querySelector('#scanYes').onclick=()=>{
+    if(!mon) return;
+    const form=detectForm(card.name);
+    collection[slotId(mon.n,form)]={cardId:card.id, name:card.name, setName:(card.set&&card.set.name)||'', image:card.image, rarity:card.rarity, no:(card.localId||'')+total, price:price!=null?{value:price,cur:'EUR'}:null, cur:'EUR', addedAt:Date.now()};
+    saveCollection(); renderGrid(); close(); toast('Adicionado ✔ '+card.name);
+  };
+}
+
 /* ============================ router ============================ */
 function route(){
   const h=location.hash.replace('#','');
   const m=h.match(/^p(\d+)(?:-([a-z]+))?$/);
   if(m){ renderDetail(+m[1], m[2]||null); }
-  else { showView('home'); curDex=null; }
+  else { showView('home'); curDex=null; renderGrid(); }   // refresh so ownership marked in detail shows on the list
 }
 window.addEventListener('hashchange', route);
 
@@ -978,6 +1116,7 @@ async function boot(){
   }catch(e){
     document.getElementById('grid').innerHTML = '<div class="errbox">Não consegui carregar a lista base. Recarrega a página.</div>'; return;
   }
+  document.getElementById('scanFab').onclick=openScan;
   renderGrid();
   route();
   if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
