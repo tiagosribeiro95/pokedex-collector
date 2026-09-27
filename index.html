@@ -211,6 +211,22 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
 .seg button{padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.rbadge.soft{background:var(--surface-3);color:var(--faint)}
+.tile.reg-tile{background:linear-gradient(180deg,color-mix(in srgb,var(--accent-soft) 55%,var(--surface)),var(--surface))}
+.cardsearch.pk{margin:4px 0 10px}
+#pkList{max-height:54vh;overflow:auto;margin:0 -4px;padding:0 4px}
+.pklist{display:flex;flex-direction:column;gap:7px}
+.pkrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:8px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.pkrow:active{transform:scale(.99)}
+.pkimg{width:44px;height:61px;flex:0 0 auto;border-radius:6px;overflow:hidden;background:var(--surface-3);display:grid;place-items:center;color:var(--faint);font-size:11px}
+.pkimg img{width:100%;height:100%;object-fit:cover}
+.pkmeta{flex:1;min-width:0}
+.pknm{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pkset{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pkrar{font-size:10.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pkprice{flex:0 0 auto;font-family:Sora;font-weight:700;font-size:14px;text-align:right;min-width:58px}
+.pkprice .usd{color:var(--muted);font-weight:600}
+.artdot{color:var(--accent-ink)}
 
 /* ---------- toast / loader ---------- */
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0));transform:translateX(-50%) translateY(20px);z-index:80;
@@ -251,7 +267,7 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
         <button class="chip on" data-filter="all">Todos</button>
         <button class="chip" data-filter="owned">Que tenho</button>
         <button class="chip" data-filter="missing">Faltam</button>
-        <button class="chip" data-filter="regional">Com regionais</button>
+        <button class="chip" data-filter="regional">Regionais</button>
       </div>
       <div class="chips" id="genChips">
         <button class="chip gen on" data-gen="all">Todas as gerações</button>
@@ -296,7 +312,7 @@ const rarityRank = r => { const i = RARITY_ORDER.indexOf(r); return i<0 ? RARITY
 const ART_KEYS = ['illustration','full art','hyper','secret','rainbow','gold','shiny','crown','amazing','radiant','star'];
 const isArtRarity = r => !!r && ART_KEYS.some(k => r.toLowerCase().includes(k));
 
-let NATIONAL = [], REGIONAL = {}, REG_TOTAL = 0;
+let NATIONAL = [], REGIONAL = {}, REG_TOTAL = 0, SETCODES = {};   // REGIONAL: {dexN:[[region,artId],...]}  SETCODES: {setId:"MEW"}
 
 /* ============================ storage ============================ */
 const LS = {
@@ -405,44 +421,59 @@ function renderProgress(){
 
 /* ============================ grid ============================ */
 let searchTerm='';
-function passesFilter(mon){
-  const owned = !!collection[slotId(mon.n)];
-  if(settings.filter==='owned' && !owned) return false;
-  if(settings.filter==='missing' && owned) return false;
-  if(settings.filter==='regional' && !REGIONAL[mon.n]) return false;
+function slotVisible(mon, region){
+  const owned = !!collection[slotId(mon.n, region)];
+  const f=settings.filter;
+  if(f==='regional' && !region) return false;      // "Regionais" mostra só formas regionais
+  if(f==='owned' && !owned) return false;
+  if(f==='missing' && owned) return false;
   if(settings.gen!=='all'){ const [a,b]=GEN_RANGES[settings.gen]; if(mon.n<a||mon.n>b) return false; }
-  if(searchTerm){ const t=searchTerm.toLowerCase(); if(!mon.name.toLowerCase().includes(t) && String(mon.n)!==t && String(mon.n).padStart(3,'0')!==t) return false; }
+  if(searchTerm){ const t=searchTerm.toLowerCase();
+    const label=((region?REGION_LABEL[region]+' ':'')+mon.name).toLowerCase();
+    if(!label.includes(t) && String(mon.n)!==t && String(mon.n).padStart(3,'0')!==t) return false; }
   return true;
 }
-function tileHTML(mon){
-  const own = collection[slotId(mon.n)];
-  const owned = !!own;
-  const regs = REGIONAL[mon.n];
-  const useCard = settings.listImage==='card' && own && own.image;
-  const img = useCard ? cardImg(own.image,'low') : ARTWORK(mon.n);
+// build the ordered grid: each base species, then its regional forms right after
+function gridSlots(){
+  const out=[];
+  for(const mon of NATIONAL){
+    if(slotVisible(mon,null)) out.push({mon});
+    const regs=REGIONAL[mon.n];
+    if(regs) for(const [region,artId] of regs){ if(slotVisible(mon,region)) out.push({mon,region,artId}); }
+  }
+  return out;
+}
+function tileHTML(slot){
+  const {mon,region,artId}=slot;
+  const own=collection[slotId(mon.n,region)];
+  const owned=!!own;
+  const name=region?`${REGION_LABEL[region]} ${mon.name}`:mon.name;
+  const useCard=settings.listImage==='card' && own && own.image;
+  const img=useCard?cardImg(own.image,'low'):ARTWORK(region?artId:mon.n);
+  const df=region?` data-form="${region}"`:'';
   let sub='';
   if(owned){
-    if(own.cardId) sub = `<div class="ownedcard">🃏 ${own.setName||''} ${own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''}</div>`;
-    else sub = `<div class="nocardtag">✔ tenho · sem carta escolhida</div>`;
-  } else sub = `<div class="nocardtag"></div>`;
-  return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''}" data-n="${mon.n}">
-    <div class="rbadges">${regs?`<span class="rbadge reg">${regs.length>1?'REG':REGION_LABEL[regs[0]].slice(0,3).toUpperCase()}</span>`:''}</div>
-    <button class="check" data-check="${mon.n}" aria-label="${owned?'Tenho':'Marcar'}">
+    if(own.cardId) sub=`<div class="ownedcard">🃏 ${own.setName||''} ${own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''}</div>`;
+    else sub=`<div class="nocardtag">✔ tenho · sem carta</div>`;
+  } else sub=`<div class="nocardtag"></div>`;
+  return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''} ${region?'reg-tile':''}" data-n="${mon.n}"${df}>
+    <div class="rbadges">${region?`<span class="rbadge reg">${REGION_LABEL[region]}</span>`:(REGIONAL[mon.n]?`<span class="rbadge soft">+ regional</span>`:'')}</div>
+    <button class="check" data-check="${mon.n}"${df} aria-label="${owned?'Tenho':'Marcar'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
     </button>
-    <div class="imgbox"><img loading="lazy" decoding="async" src="${img}" alt="${mon.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
-    <div class="num tnum">#${String(mon.n).padStart(4,'0')}</div>
-    <div class="nm">${mon.name}</div>
+    <div class="imgbox"><img loading="lazy" decoding="async" src="${img}" alt="${name}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
+    <div class="num tnum">#${String(mon.n).padStart(4,'0')}${region?' · '+REGION_LABEL[region].slice(0,3):''}</div>
+    <div class="nm">${name}</div>
     ${sub}
   </article>`;
 }
 function renderGrid(){
-  const list = NATIONAL.filter(passesFilter);
+  const slots = gridSlots();
   const grid = document.getElementById('grid');
   const empty = document.getElementById('gridEmpty');
-  if(!list.length){ grid.innerHTML=''; empty.hidden=false; empty.innerHTML='<b>Nada por aqui</b><br>Experimenta outro filtro ou pesquisa.'; return; }
+  if(!slots.length){ grid.innerHTML=''; empty.hidden=false; empty.innerHTML='<b>Nada por aqui</b><br>Experimenta outro filtro ou pesquisa.'; return; }
   empty.hidden=true;
-  grid.innerHTML = list.map(tileHTML).join('');
+  grid.innerHTML = slots.map(tileHTML).join('');
   renderProgress();
 }
 
@@ -455,14 +486,14 @@ function showView(which){
   document.getElementById('detailView').hidden = which!=='detail';
   document.getElementById('brandtxt').textContent = which==='home' ? 'Pokédex Collector' : '';
 }
-function openDetail(n, pick){
-  curDex=n; curForm='base'; curCards=null; priceMap={}; pickIntent=!!pick;
-  location.hash = 'p'+n;
+function openDetail(n, pick, form){
+  pickIntent=!!pick;
+  location.hash = 'p'+n + (form?('-'+form):'');
 }
 function closeDetail(){ location.hash=''; }
 
-async function renderDetail(n){
-  curDex=n; curForm='base'; curCards=null; priceMap={}; cardQuery='';   // own the state so direct URL / reload works
+async function renderDetail(n, form){
+  curDex=n; curForm=form||'base'; curCards=null; priceMap={}; cardQuery='';   // own the state so direct URL / reload works
   showView('detail');
   const mon = NATIONAL.find(m=>m.n===n);
   const el = document.getElementById('detailView');
@@ -535,7 +566,7 @@ function paintForm(mon){
     <div class="sectrow"><h2>Cartas disponíveis</h2><span class="sub" id="cardCountSub"></span></div>
     <div class="cardsearch">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-      <input id="cardSearch" type="search" placeholder="Procurar carta: nome, nº (ex. 006 ou 6/165) ou set…" value="${cardQuery.replace(/"/g,'&quot;')}" autocomplete="off" enterkeyhint="search">
+      <input id="cardSearch" type="search" placeholder="Procurar: nome, nº (019/165), set ou código (MEW)…" value="${cardQuery.replace(/"/g,'&quot;')}" autocomplete="off" enterkeyhint="search">
       <button class="cs-clear" id="csClear" aria-label="Limpar" ${cardQuery?'':'hidden'}>✕</button>
     </div>
     ${cardQuery?'<div class="searchnote">A procurar em todas as formas deste Pokémon.</div>':''}
@@ -609,14 +640,19 @@ function cardHTML(c, ownedIds, topId){
 }
 function allCardsOf(){ let a=[]; for(const f in curCards) a=a.concat(curCards[f]); return a; }
 function ownedIdSet(){ const s=new Set(); for(const k in collection){ const o=collection[k]; if(o&&o.cardId) s.add(o.cardId); } return s; }
+function cardMatches(c, qraw){
+  const q=(qraw||'').toLowerCase().replace(/\s+/g,'');
+  if(!q) return true;
+  const code=SETCODES[c.set.id]||'';                       // ex. "MEW" (set 151)
+  const num=(c.localId!=null?String(c.localId):'');         // "019"
+  const numNoZero=num.replace(/^0+/,'')||num;               // "19"
+  const tot=(c.set.cardCount&&c.set.cardCount.official)?String(c.set.cardCount.official):'';
+  const hay=[c.name,c.set.name,code,c.id,num,numNoZero,num+'/'+tot,numNoZero+'/'+tot,(c.rarity||'')]
+    .join(' ').toLowerCase().replace(/\s+/g,'');
+  return hay.includes(q);
+}
 function visibleCards(){
-  if(cardQuery){
-    const q = cardQuery.toLowerCase().replace(/\s+/g,'');
-    return allCardsOf().filter(c=>{
-      const hay = (c.name+' '+c.set.name+' '+c.id+' '+(c.localId||'')+' '+cardNo(c)+' '+(c.rarity||'')).toLowerCase().replace(/\s+/g,'');
-      return hay.includes(q);
-    });
-  }
+  if(cardQuery) return allCardsOf().filter(c=>cardMatches(c, cardQuery));
   return (curCards[curForm]||[]).slice();
 }
 function renderCards(mon, sid){
@@ -729,14 +765,14 @@ function toast(msg, undo){
 /* ============================ grid interactions ============================ */
 document.getElementById('grid').addEventListener('click', e=>{
   const chk = e.target.closest('[data-check]');
-  if(chk){ e.stopPropagation(); const n=+chk.dataset.check; const sid=slotId(n);
+  if(chk){ e.stopPropagation(); const n=+chk.dataset.check; const region=chk.dataset.form||null; const sid=slotId(n,region);
     if(collection[sid]){ // unmark
       const removed = collection[sid]; delete collection[sid]; saveCollection(); renderGrid();
       toast('Removido', ()=>{ collection[sid]=removed; saveCollection(); renderGrid(); toast('Reposto ✔'); });
-    } else { openDetail(n, true); } // marking asks which card -> open detail in pick mode
+    } else { openCardPicker(NATIONAL.find(m=>m.n===n), region||'base'); } // asks which card, stays on list
     return;
   }
-  const tile = e.target.closest('.tile'); if(tile) openDetail(+tile.dataset.n, false);
+  const tile = e.target.closest('.tile'); if(tile) openDetail(+tile.dataset.n, false, tile.dataset.form||null);
 });
 
 /* ============================ filters / search ============================ */
@@ -758,6 +794,63 @@ function openSheet(html){
   const close=()=>{ scrim.classList.remove('show'); setTimeout(()=>scrim.remove(),240); };
   scrim.addEventListener('click', e=>{ if(e.target===scrim) close(); });
   return {scrim, close};
+}
+
+/* ============================ quick card picker (from the list) ============================ */
+async function openCardPicker(mon, form){
+  if(!mon) return;
+  const label = form==='base' ? mon.name : `${FORM_LABEL[form]||''} ${mon.name}`.trim();
+  const {scrim, close} = openSheet(`
+    <h3>Que carta tens?</h3>
+    <p class="s">${label} · #${String(mon.n).padStart(4,'0')}</p>
+    <div class="cardsearch pk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="pkSearch" type="search" placeholder="nome, nº (019/165) ou código (MEW)…" autocomplete="off" enterkeyhint="search"></div>
+    <div id="pkList"><div class="loader" style="padding:34px 0"><div class="spin"></div><span>A carregar cartas…</span></div></div>
+    <button class="btn ghost" id="pkNoCard" style="width:100%;margin-top:10px;justify-content:center;text-align:center">Marcar como tido (escolher carta depois)</button>
+  `);
+  scrim.querySelector('#pkNoCard').onclick=()=>{ collection[slotId(mon.n,form)]={cardId:null,addedAt:Date.now()}; saveCollection(); renderGrid(); close(); toast('Marcado ✔'); };
+  const listEl=scrim.querySelector('#pkList');
+  let cards=[];
+  try{
+    const all=await fetchDexCards(mon.n);
+    const byForm={}; all.forEach(c=>{ const f=detectForm(c.name); (byForm[f]=byForm[f]||[]).push(c); });
+    cards=byForm[form]||[];
+  }catch(e){ listEl.innerHTML='<div class="errbox">Sem ligação. Fecha e tenta outra vez.</div>'; return; }
+  if(!cards.length){ listEl.innerHTML='<div class="errbox">Ainda não há cartas desta forma na base de dados. Podes marcar como tido em baixo.</div>'; return; }
+  const pick=c=>{ const p=priceMap[c.id];
+    collection[slotId(mon.n,form)]={cardId:c.id,name:c.name,setName:c.set.name,image:c.image,rarity:c.rarity,no:cardNo(c),price:p&&p.value!=null?p:null,cur:p&&p.cur,addedAt:Date.now()};
+    saveCollection(); renderGrid(); close(); toast('Guardado ✔ '+c.name); };
+  function draw(q){
+    const list=(q?cards.filter(c=>cardMatches(c,q)):cards.slice())
+      .sort((a,b)=>{ const va=(priceMap[a.id]&&priceMap[a.id].value)??-1, vb=(priceMap[b.id]&&priceMap[b.id].value)??-1; if(vb!==va) return vb-va; return rarityRank(a.rarity)-rarityRank(b.rarity); });
+    if(!list.length){ listEl.innerHTML='<div class="errbox">Nenhuma carta encontrada.</div>'; return; }
+    listEl.innerHTML='<div class="pklist">'+list.map(pkRow).join('')+'</div>';
+    listEl.querySelectorAll('[data-pk]').forEach(b=> b.onclick=()=>pick(cards.find(c=>c.id===b.dataset.pk)));
+    pkPrices(list, listEl);
+  }
+  draw('');
+  const si=scrim.querySelector('#pkSearch'); let t=null;
+  si.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>draw(si.value.trim()), 150); });
+}
+function pkRow(c){
+  const no=cardNo(c), code=SETCODES[c.set.id]||'', art=isArtRarity(c.rarity), p=priceMap[c.id];
+  const priceHTML = p===undefined ? '<span class="load"></span>' : `<b class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</b>`;
+  return `<button class="pkrow" data-pk="${c.id}">
+    <div class="pkimg">${c.image?`<img loading="lazy" decoding="async" src="${cardImg(c.image,'low')}" alt="" onerror="this.style.visibility='hidden'">`:'<span>—</span>'}</div>
+    <div class="pkmeta"><div class="pknm">${art?'<span class="artdot">★</span> ':''}${c.name}</div>
+      <div class="pkset">${c.set.name}${no?' · '+no:''}${code?' · '+code:''}</div>
+      <div class="pkrar">${c.rarity||''}</div></div>
+    <div class="pkprice">${priceHTML}</div>
+  </button>`;
+}
+async function pkPrices(list, listEl){
+  const need=list.filter(c=>priceMap[c.id]===undefined);
+  if(!need.length) return;
+  await pool(need, async c=>{
+    const p=await fetchPrice(c.id); priceMap[c.id]=p||{value:null};
+    const cell=listEl.querySelector(`.pkrow[data-pk="${CSS.escape(c.id)}"] .pkprice`);
+    if(cell) cell.innerHTML=`<b class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</b>`;
+  }, 6);
 }
 document.getElementById('menuBtn').onclick = ()=>{
   const p=progress();
@@ -809,8 +902,8 @@ function applyTheme(){
 /* ============================ router ============================ */
 function route(){
   const h=location.hash.replace('#','');
-  const m=h.match(/^p(\d+)$/);
-  if(m){ renderDetail(+m[1]); }
+  const m=h.match(/^p(\d+)(?:-([a-z]+))?$/);
+  if(m){ renderDetail(+m[1], m[2]||null); }
   else { showView('home'); curDex=null; }
 }
 window.addEventListener('hashchange', route);
@@ -824,8 +917,13 @@ async function boot(){
   document.querySelectorAll('#genChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.gen===settings.gen));
   sortMode = settings.sort || 'value';
   try{
-    const [nat, reg] = await Promise.all([ fetch('national.json').then(r=>r.json()), fetch('regional.json').then(r=>r.json()) ]);
-    NATIONAL = nat; REGIONAL = reg; REG_TOTAL = Object.values(reg).reduce((s,a)=>s+a.length,0);
+    const [nat, reg, sc] = await Promise.all([
+      fetch('national.json').then(r=>r.json()),
+      fetch('regional.json').then(r=>r.json()),
+      fetch('sets.json').then(r=>r.json()).catch(()=>({}))
+    ]);
+    NATIONAL = nat; REGIONAL = reg; SETCODES = sc || {};
+    REG_TOTAL = Object.values(reg).reduce((s,a)=>s+a.length,0);
   }catch(e){
     document.getElementById('grid').innerHTML = '<div class="errbox">Não consegui carregar a lista base. Recarrega a página.</div>'; return;
   }
