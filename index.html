@@ -997,7 +997,7 @@ function applyTheme(){
 
 /* ============================ scan (camera + OCR) ============================ */
 let _codeToSet=null;
-function codeToSet(){ if(_codeToSet) return _codeToSet; _codeToSet={}; for(const sid in SETCODES){ const c=(SETCODES[sid]||'').toUpperCase(); if(c && !_codeToSet[c]) _codeToSet[c]=sid; } return _codeToSet; }
+function codeToSet(){ if(_codeToSet) return _codeToSet; _codeToSet={}; for(const sid in SETCODES){ const c=(SETCODES[sid]||'').toUpperCase(); if(!c) continue; (_codeToSet[c]=_codeToSet[c]||[]).push(sid); } return _codeToSet; }  // um código pode ter vários sets (ex. 30C)
 function loadTesseract(){
   if(window.Tesseract) return Promise.resolve();
   return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload=res; s.onerror=()=>rej(new Error('cdn')); document.head.appendChild(s); });
@@ -1044,7 +1044,12 @@ async function openScan(){
   capBtn.onclick=async()=>{
     const vw=video.videoWidth, vh=video.videoHeight; if(!vw){ return; }
     capBtn.disabled=true;
-    const cv=document.createElement('canvas'); cv.width=vw; cv.height=vh; cv.getContext('2d').drawImage(video,0,0,vw,vh);
+    const cv=document.createElement('canvas'); cv.width=vw; cv.height=vh; const cx=cv.getContext('2d'); cx.drawImage(video,0,0,vw,vh);
+    // tons de cinza + contraste ajudam o OCR a ler o número/código pequenos
+    try{ const im=cx.getImageData(0,0,vw,vh); const d=im.data;
+      for(let i=0;i<d.length;i+=4){ let g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2]; g=(g-128)*1.4+128; d[i]=d[i+1]=d[i+2]=(g<0?0:g>255?255:g); }
+      cx.putImageData(im,0,0);
+    }catch(e){}
     stopCam();
     ov.querySelector('.scan-stage').innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>A ler a carta…<br><small>(a 1ª vez descarrega o motor de OCR — pode demorar)</small></div>`;
     ov.querySelector('.scan-actions').innerHTML='';
@@ -1058,9 +1063,9 @@ async function handleScanResult(ov, parsed, close){
   const retry=()=>{ ov.remove(); openScan(); };
   if(parsed.code && parsed.num){
     stage.innerHTML=`<div class="scan-msg"><div class="spin" style="margin:0 auto 14px"></div>Encontrei <b>${parsed.code} ${parsed.num}</b> — a procurar…</div>`;
-    const setId=codeToSet()[parsed.code];
-    const id=setId?await findCardId(setId, parsed.num):null;
-    const card=id?await fetchCardFull(id):null;
+    const setIds=codeToSet()[parsed.code]||[];
+    let card=null;
+    for(const setId of setIds){ const id=await findCardId(setId, parsed.num); if(id){ card=await fetchCardFull(id); if(card) break; } }
     if(card){ return showScanCard(ov, card, retry, close); }
   }
   stage.innerHTML=`<div class="scan-msg">Não consegui identificar a carta.<br><br>${parsed.raw?('Li: <span class="scan-ocr">'+parsed.raw.replace(/</g,'&lt;').slice(0,140)+'</span><br><br>'):''}Tenta com mais luz e o canto do número/código bem enquadrado.</div>`;
