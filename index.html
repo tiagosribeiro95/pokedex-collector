@@ -818,11 +818,17 @@ function choose(mon, card){
   if(!card) return;
   const f = detectForm(card.name);
   const sid = slotId(mon.n, f);
-  const p = priceMap[card.id];
-  collection[sid] = {cardId:card.id, name:card.name, setName:card.set.name, image:card.image, rarity:card.rarity, no:cardNo(card), price:p&&p.value!=null?p:null, cur:p&&p.cur, addedAt:Date.now()};
+  const isMine = collection[sid] && collection[sid].cardId===card.id;
+  if(isMine){                                   // já é a minha → carregar de novo remove (toggle)
+    delete collection[sid];
+    toast('Removida');
+  } else {
+    const p = priceMap[card.id];
+    collection[sid] = {cardId:card.id, name:card.name, setName:card.set.name, image:card.image, rarity:card.rarity, no:cardNo(card), price:p&&p.value!=null?p:null, cur:p&&p.cur, addedAt:Date.now()};
+    toast('Guardado ✔ '+card.name);
+  }
   saveCollection();
   pickIntent=false; cardQuery='';
-  toast('Guardado ✔ '+card.name);
   curForm = f;
   const formsPresent = FORM_ORDER.filter(x=>curCards[x] && curCards[x].length);
   paintDetail(mon, formsPresent);
