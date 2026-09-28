@@ -639,11 +639,19 @@ function progress(){
   }
   return {base, reg, other};
 }
+function pokedexValue(){   // valor das cartas representativas da Pokédex (1 por slot)
+  let t=0,n=0;
+  for(const k in collection){ const rep=collection[k]; if(rep&&rep.cardId){ n++;
+    let v=0; cardLots(rep.cardId).forEach(l=>{ const u=cardUnitValue(l); if(u&&u.value>v) v=u.value; });
+    if(!v && rep.price&&rep.price.value!=null) v=rep.price.value; t+=v; } }
+  return {value:t, count:n};
+}
 function renderProgress(){
   const p = progress();
   const pct = Math.round(p.base/NATIONAL.length*100);
   document.getElementById('pbarFill').style.width = pct+'%';
-  document.getElementById('pcount').innerHTML = `<b>${p.base}</b>/${NATIONAL.length}`;
+  const pv = pokedexValue();
+  document.getElementById('pcount').innerHTML = `<b>${p.base}</b>/${NATIONAL.length}${pv.value>0?(' · '+fmtEur(pv.value)):''}`;
 }
 
 /* ============================ grid ============================ */
@@ -1432,7 +1440,10 @@ function paintWallet(){
   document.getElementById('wMove').innerHTML=chip('7d',d7)+chip('30d',d30);
   const setsArr=Object.entries(bySet).sort((a,b)=>b[1].val-a[1].val);
   const top=cards.filter(c=>cardUnitValue(c)).sort((a,b)=>cardTotalValue(b)-cardTotalValue(a)).slice(0,10);
-  body.innerHTML=`<div class="seclabel">Valor por coleção</div>
+  const pv=pokedexValue();
+  body.innerHTML=`<div class="seclabel">Coleção Pokédex</div>
+    <div class="wsetlist" style="margin-bottom:2px"><div class="wsetrow" style="background:var(--accent-soft)"><span class="wsr-n">📕 1 carta por Pokémon</span><span class="wsr-c tnum">${pv.count}</span><span class="wsr-v tnum">${fmtEur(pv.value)}</span></div></div>
+    <div class="seclabel">Valor por coleção</div>
     <div class="wsetlist">${setsArr.slice(0,12).map(([sid,s])=>`<div class="wsetrow"><span class="wsr-n">${s.name}</span><span class="wsr-c tnum">${s.n}</span><span class="wsr-v tnum">${fmtEur(s.val)}</span></div>`).join('')}</div>
     <div class="seclabel">Cartas mais valiosas</div>
     <div class="wtoplist">${top.map(c=>{ const u=cardUnitValue(c); return `<div class="wtop"><div class="wt-img"><img loading="lazy" src="${c.image?cardImg(c.image,'low'):PLACEHOLDER}" onerror="this.src='${PLACEHOLDER}'"></div>
