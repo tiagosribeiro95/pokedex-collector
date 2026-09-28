@@ -521,7 +521,7 @@ function cardTotalValue(c){ const u=cardUnitValue(c); return u? u.value*(c.qty||
 function walletTotal(){ let t=0; for(const id in owned) t+=cardTotalValue(owned[id]); return t; }
 async function refreshOwnedPrices(onProgress){
   const byCard={};
-  for(const k in owned){ const c=owned[k]; if(c.value!=null) continue; const has=c.mkt&&(c.mkt.base||c.mkt.foil||c.mkt.value!=null); if(!has || (Date.now()-(c.mktTs||0))>3*DAY) (byCard[c.id]=byCard[c.id]||[]).push(k); }
+  for(const k in owned){ const c=owned[k]; if(c.value!=null) continue; const has=c.mkt&&(c.mkt.base||c.mkt.foil||c.mkt.value!=null); if(!has || (Date.now()-(c.mktTs||0))>1*DAY) (byCard[c.id]=byCard[c.id]||[]).push(k); }
   const ids=Object.keys(byCard); let done=0,total=ids.length; if(onProgress) onProgress(0,total);
   await pool(ids, async id=>{ const d=await fetchDetail(owned[byCard[id][0]]);
     const prices=(d&&d.prices&&(d.prices.base||d.prices.foil))?d.prices:null;
@@ -576,7 +576,7 @@ async function fetchDetail(card){
   const lang = (typeof card==='object' && card.lang) || 'en';
   const key = 'det:'+id;
   const c = await idbGet(key);
-  if (c && (Date.now()-c.ts) < 3*DAY) return c.val;
+  if (c && (Date.now()-c.ts) < 1*DAY) return c.val;
   let val = {price:null};
   try{
     const r = await fetch(REST_LANG(lang)+id);
@@ -864,7 +864,7 @@ function cardHTML(c, ownedIds, topId){
   const p = priceMap[c.id];
   const art = isArtRarity(c.rarity);
   const isMine = ownedIds.has(c.id);
-  const cmSearch = `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(c.name)}`;
+  const cmSearch = `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent((c.name+' '+((c.set&&c.set.name)||'')).trim())}`;
   const priceHTML = p===undefined ? '<span class="load"></span>' : `<span class="${p&&p.cur==='USD'?'usd':''}">${fmtPrice(p)}</span>`;
   const no = cardNo(c);
   const imgCell = c.image
@@ -1455,9 +1455,10 @@ async function openCardEditor(card, onDone, opts){
 async function renderWallet(){
   const el=document.getElementById('walletView');
   if(!Object.keys(owned).length){ el.innerHTML=`<div class="vhead"><h1>Carteira</h1></div><div class="empty"><b>Ainda sem cartas</b><br>Marca cartas na Pokédex ou nas Coleções — o valor aparece aqui.</div>`; return; }
-  el.innerHTML=`<div class="vhead"><h1>Carteira</h1><p class="vsub" id="wSub"></p></div>
+  el.innerHTML=`<div class="vhead"><div class="row"><h1 style="flex:1">Carteira</h1><button class="btn sm" id="wRefresh">↻ Atualizar</button></div><p class="vsub" id="wSub"></p></div>
     <div class="wtotal"><div class="wt-val" id="wTotal">${fmtEur(walletTotal())}</div><div class="wt-move" id="wMove"></div></div>
     <div id="wProg" class="wprog"></div><div id="wBody"></div>`;
+  document.getElementById('wRefresh').onclick=()=>{ for(const k in owned) owned[k].mktTs=0; saveOwned(); renderWallet(); };
   await refreshOwnedPrices((d,t)=>{ const p=document.getElementById('wProg'); if(p) p.textContent=d<t?`a atualizar preços ${d}/${t}…`:''; const wt=document.getElementById('wTotal'); if(wt) wt.textContent=fmtEur(walletTotal()); });
   const pr=document.getElementById('wProg'); if(pr) pr.textContent='';
   paintWallet();
