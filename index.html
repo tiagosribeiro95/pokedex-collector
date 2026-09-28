@@ -250,7 +250,12 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* scan */
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0));z-index:40;display:flex;align-items:center;gap:8px;
+.botnav{position:fixed;left:0;right:0;bottom:0;z-index:35;display:flex;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 8px;color:var(--faint);font-size:11px;font-weight:600;font-family:Sora}
+.navbtn svg{width:22px;height:22px}
+.navbtn.on{color:var(--accent-ink)}
+main{padding-bottom:68px}
+.fab{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom,0));z-index:40;display:flex;align-items:center;gap:8px;
   padding:13px 17px;border-radius:99px;background:var(--accent);color:#231a04;font-weight:700;font-size:14px;font-family:Sora;
   box-shadow:0 6px 20px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.16)}
 .fab svg{width:20px;height:20px}
@@ -289,6 +294,58 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .scan-numrow{display:flex;align-items:center;gap:10px;margin-bottom:2px}
 .scan-numrow label{font-size:12px;color:#c8ccd6;width:54px;flex:0 0 auto}
 .scan-numrow input{flex:1;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:16px}
+/* nav views: sets & wallet */
+.vhead{padding:14px 0 6px}
+.vhead h1{font-size:24px;font-weight:700;letter-spacing:-.4px}
+.vsub{color:var(--muted);font-size:13px;margin:3px 0 0}
+.seclabel{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:700;margin:18px 0 8px}
+.setcards{display:flex;flex-direction:column;gap:8px}
+.setcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:13px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.setcard.has{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.sc-main{flex:1;min-width:0}
+.sc-main b{font-size:14.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-main span{font-size:12px;color:var(--muted)}
+.sc-val{font-family:Sora;font-weight:700;font-size:14px;color:var(--accent-ink)}
+.sc-add{width:30px;height:30px;border-radius:9px;background:var(--surface-2);color:var(--muted);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+.setmeta{font-size:13px;color:var(--muted);margin:2px 0 12px}
+.setmeta b{color:var(--ink)}
+.wtotal{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);text-align:center;margin-bottom:8px}
+.wt-val{font-family:Sora;font-weight:700;font-size:40px;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.wt-move{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.mchip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px}
+.mchip.up{background:var(--good-soft);color:var(--good)}
+.mchip.down{background:#fde2e2;color:#c0392b}
+:root[data-theme="dark"] .mchip.down,:root:not([data-theme="light"]) .mchip.down{background:#3a1f1f;color:#f0a0a0}
+.wprog{text-align:center;font-size:12px;color:var(--faint);min-height:14px;margin-bottom:6px}
+.wsetlist{display:flex;flex-direction:column;gap:1px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.wsetrow{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--surface)}
+.wsr-n{flex:1;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wsr-c{color:var(--muted);font-size:12px}
+.wsr-v{font-family:Sora;font-weight:700;font-size:13.5px;min-width:60px;text-align:right}
+.wtoplist{display:flex;flex-direction:column;gap:7px}
+.wtop{display:flex;align-items:center;gap:11px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.wt-img{width:40px;height:56px;flex:0 0 auto;border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.wt-img img{width:100%;height:100%;object-fit:cover}
+.wt-m{flex:1;min-width:0}
+.wt-m b{font-size:13.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt-m span{font-size:11.5px;color:var(--muted)}
+.wt-v{font-family:Sora;font-weight:700;font-size:14px;text-align:right;min-width:66px}
+.wt-v small{display:block;font-family:Inter;font-weight:500;font-size:10px;color:var(--faint)}
+.wnote{font-size:11px;color:var(--faint);margin:16px 0 0;line-height:1.5}
+.ed-card{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.ed-img{width:58px;flex:0 0 auto;aspect-ratio:734/1024;border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.ed-img img{width:100%;height:100%;object-fit:cover}
+.ed-meta b{font-size:15px;font-family:Sora}
+.ed-meta span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.ed-mkt{color:var(--accent-ink)!important;font-weight:700}
+.ed-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 2px;border-top:1px solid var(--line)}
+.ed-row label{font-size:13px;font-weight:600}
+.ed-row label small{font-weight:400;color:var(--muted)}
+.ed-row select,.ed-row input{padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font-size:14px;min-width:150px;text-align:right}
+.stepper{display:flex;align-items:center;background:var(--surface-2);border-radius:10px;border:1px solid var(--line);overflow:hidden}
+.stepper button{width:40px;height:38px;font-size:18px;color:var(--ink)}
+.stepper span{min-width:36px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.ed-actions{display:flex;gap:8px;margin-top:14px}
 </style>
 </head>
 <body>
@@ -332,8 +389,16 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 
 <main>
   <div id="homeView" class="wrap"><div class="grid" id="grid"></div><div id="gridEmpty" class="empty" hidden></div></div>
+  <div id="setsView" class="wrap" hidden></div>
+  <div id="walletView" class="wrap" hidden></div>
   <div id="detailView" class="detail" hidden></div>
 </main>
+
+<nav class="botnav" id="botnav">
+  <button class="navbtn on" data-tab="dex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg><span>Pokédex</span></button>
+  <button class="navbtn" data-tab="sets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="20"/></svg><span>Sets</span></button>
+  <button class="navbtn" data-tab="wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1"/><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2H6"/><circle cx="16.5" cy="13.5" r="1.2"/></svg><span>Carteira</span></button>
+</nav>
 
 <button class="fab" id="scanFab" aria-label="Digitalizar carta">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 012-2h1l1.2-1.6A2 2 0 018.8 4.5h6.4a2 2 0 011.6.9L18 7h1a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
@@ -378,6 +443,56 @@ let settings = Object.assign({filter:'all', gen:'all', listImage:'pokemon', sort
 const saveCollection = () => LS.set('pdc.collection', collection);
 const saveSettings = () => LS.set('pdc.settings', settings);
 const slotId = (n, form) => (form && form!=='base') ? `d${n}:${form}` : `d${n}`;
+
+/* ---- owned cards: card-level store (wallet + sets source of truth) ---- */
+const GRADES = ['raw','PSA 10','PSA 9','PSA 8','BGS 10','BGS 9.5','BGS 9','CGC 10','CGC 9.5','CGC 9','SGC 10','Outra'];
+const setIdOf = cid => (cid && cid.indexOf('-')>=0) ? cid.slice(0, cid.lastIndexOf('-')) : (cid||'');
+let owned = LS.get('pdc.owned', null);
+if(owned===null){                         // migração única da coleção antiga (uma carta por Pokémon)
+  owned={};
+  for(const k in collection){ const o=collection[k]; if(o && o.cardId){
+    const dm=k.match(/^d(\d+)/);
+    owned[o.cardId]={ id:o.cardId, name:o.name||'', setId:setIdOf(o.cardId), setName:o.setName||'', image:o.image||null,
+      rarity:o.rarity||null, no:o.no||'', dexId: dm?[+dm[1]]:[], lang:'en', qty:1, grade:'raw', value:null,
+      mkt:(o.price&&o.price.value!=null)?{value:o.price.value,cur:o.price.cur||'EUR'}:null, addedAt:o.addedAt||Date.now() };
+  }}
+  LS.set('pdc.owned', owned);
+}
+const saveOwned = () => LS.set('pdc.owned', owned);
+
+let ownedByDex={};
+function rebuildOwnedIndex(){ ownedByDex={}; for(const id in owned){ (owned[id].dexId||[]).forEach(n=>{ (ownedByDex[n]=ownedByDex[n]||[]).push(id); }); } }
+rebuildOwnedIndex();
+function ownedMatchesSlot(n, form){ const ids=ownedByDex[n]; if(!ids) return null; form=form||'base';
+  for(const id of ids){ if(owned[id] && detectForm(owned[id].name)===form) return owned[id]; } return null; }
+function addOwnedCard(card, opts){
+  opts=opts||{}; const id=card.id; if(!id) return null; const ex=owned[id];
+  const total=(card.set&&card.set.cardCount&&card.set.cardCount.official)?('/'+card.set.cardCount.official):'';
+  owned[id]={ id, name:card.name||(ex&&ex.name)||'', setId:setIdOf(id),
+    setName:(card.set&&card.set.name)||card.setName||(ex&&ex.setName)||'',
+    image:(card.image!==undefined?card.image:(ex&&ex.image))||null,
+    rarity:(card.rarity!==undefined?card.rarity:(ex&&ex.rarity))||null,
+    no:(card.localId!=null?(String(card.localId)+total):(card.no||(ex&&ex.no)||'')),
+    dexId:(card.dexId&&card.dexId.length?card.dexId:(ex&&ex.dexId))||[], lang:card.lang||(ex&&ex.lang)||'en',
+    qty:(opts.qty!=null?opts.qty:(ex?ex.qty:1)), grade:(opts.grade||(ex?ex.grade:'raw')),
+    value:(opts.value!==undefined?opts.value:(ex?ex.value:null)),
+    mkt:(ex?ex.mkt:null), mktTs:(ex?ex.mktTs:0), addedAt:(ex?ex.addedAt:Date.now()) };
+  saveOwned(); rebuildOwnedIndex(); return owned[id];
+}
+function removeOwnedCard(id){ if(owned[id]){ delete owned[id]; saveOwned(); rebuildOwnedIndex(); } }
+function cardUnitValue(c){ if(!c) return null; if(c.value!=null) return {value:c.value,cur:'EUR',manual:true}; if(c.mkt&&c.mkt.value!=null) return {value:c.mkt.value,cur:c.mkt.cur||'EUR',manual:false}; return null; }
+function cardTotalValue(c){ const u=cardUnitValue(c); return u? u.value*(c.qty||1) : 0; }
+function walletTotal(){ let t=0; for(const id in owned) t+=cardTotalValue(owned[id]); return t; }
+async function refreshOwnedPrices(onProgress){
+  const need=Object.keys(owned).filter(id=> owned[id].value==null && (!owned[id].mkt || !owned[id].mkt.value || (Date.now()-(owned[id].mktTs||0))>3*DAY));
+  let done=0, total=need.length; if(onProgress) onProgress(0,total);
+  await pool(need, async id=>{ const d=await fetchDetail(owned[id]);
+    if(d && d.price){ owned[id].mkt={value:d.price.value,cur:d.price.cur,avg7:d.price.avg7,avg30:d.price.avg30}; }
+    else { owned[id].mkt=owned[id].mkt||{value:null}; }
+    owned[id].mktTs=Date.now(); done++; if(onProgress) onProgress(done,total);
+  }, 8);
+  saveOwned(); return total;
+}
 
 // IndexedDB cache for API responses
 let _db=null;
@@ -434,7 +549,7 @@ async function fetchDetail(card){
       const tp = j.pricing && j.pricing.tcgplayer;
       let price=null;
       if(cm && (cm.trend||cm.avg||cm.low)!=null){
-        price = {value: cm.trend ?? cm.avg ?? cm.low, cur:'EUR', low:cm.low, avg:cm.avg, trend:cm.trend, updated:cm.updated};
+        price = {value: cm.trend ?? cm.avg ?? cm.low, cur:'EUR', low:cm.low, avg:cm.avg, trend:cm.trend, avg7:cm.avg7, avg30:cm.avg30, updated:cm.updated};
       } else if(tp){
         let mp=null; for(const k in tp){ if(tp[k] && typeof tp[k]==='object' && tp[k].marketPrice!=null){ mp=tp[k].marketPrice; break; } }
         if(mp!=null) price = {value:mp, cur:'USD'};
@@ -570,12 +685,16 @@ function renderGrid(){
 /* ============================ detail ============================ */
 let curDex=null, curForm='base', curCards=null, sortMode=settings.sort, priceMap={}, priceToken=0, pickIntent=false, cardQuery='', imgToken=0;
 
-function showView(which){
+function showView(which){   // 'home'(dex) | 'sets' | 'wallet' | 'detail'
   document.getElementById('homeView').hidden = which!=='home';
   document.getElementById('homeControls').hidden = which!=='home';
+  document.getElementById('setsView').hidden = which!=='sets';
+  document.getElementById('walletView').hidden = which!=='wallet';
   document.getElementById('detailView').hidden = which!=='detail';
-  const fab=document.getElementById('scanFab'); if(fab) fab.hidden = which!=='home';
-  document.getElementById('brandtxt').textContent = which==='home' ? 'Pokédex Collector' : '';
+  const fab=document.getElementById('scanFab'); if(fab) fab.hidden = !(which==='home'||which==='sets');
+  const nav=document.getElementById('botnav'); if(nav) nav.hidden = which==='detail';
+  if(which!=='detail'){ const tab=which==='home'?'dex':which; document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
+  document.getElementById('brandtxt').textContent = which==='home'?'Pokédex Collector':which==='sets'?'Coleções':which==='wallet'?'Carteira':'';
 }
 function openDetail(n, pick, form){
   pickIntent=!!pick;
@@ -672,7 +791,7 @@ function paintForm(mon){
 
   // wire "mine" actions
   const changeBtn = body.querySelector('#changeCard'); if(changeBtn) changeBtn.onclick=()=>{ document.getElementById('cgrid').scrollIntoView({behavior:'smooth'}); };
-  const rem = body.querySelector('#removeOwn'); if(rem) rem.onclick=()=>{ delete collection[sid]; saveCollection(); toast('Removido'); afterOwnChange(mon); };
+  const rem = body.querySelector('#removeOwn'); if(rem) rem.onclick=()=>{ if(collection[sid]&&collection[sid].cardId) removeOwnedCard(collection[sid].cardId); delete collection[sid]; saveCollection(); toast('Removido'); afterOwnChange(mon); };
   const pb = body.querySelector('#pickBelow'); if(pb) pb.onclick=()=>document.getElementById('cgrid').scrollIntoView({behavior:'smooth'});
   const mnc = body.querySelector('#markNoCard'); if(mnc) mnc.onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); toast('Marcado ✔'); pickIntent=false; afterOwnChange(mon); };
 
@@ -829,21 +948,11 @@ function choose(mon, card){
   if(!card) return;
   const f = detectForm(card.name);
   const sid = slotId(mon.n, f);
-  const isMine = collection[sid] && collection[sid].cardId===card.id;
-  if(isMine){                                   // já é a minha → carregar de novo remove (toggle)
-    delete collection[sid];
-    toast('Removida');
-  } else {
-    const p = priceMap[card.id];
-    collection[sid] = {cardId:card.id, name:card.name, setName:card.set.name, image:card.image, rarity:card.rarity, no:cardNo(card), price:p&&p.value!=null?p:null, cur:p&&p.cur, addedAt:Date.now()};
-    toast('Guardado ✔ '+card.name);
+  const repaint=()=>{ pickIntent=false; cardQuery=''; curForm=f; paintDetail(mon, FORM_ORDER.filter(x=>curCards[x]&&curCards[x].length)); renderProgress(); };
+  if(collection[sid] && collection[sid].cardId===card.id){   // já é a minha → remove (toggle)
+    removeOwnedCard(card.id); delete collection[sid]; saveCollection(); repaint(); toast('Removida'); return;
   }
-  saveCollection();
-  pickIntent=false; cardQuery='';
-  curForm = f;
-  const formsPresent = FORM_ORDER.filter(x=>curCards[x] && curCards[x].length);
-  paintDetail(mon, formsPresent);
-  renderProgress();
+  openCardEditor({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:[mon.n],lang:card.lang}, repaint, {setAsRep:true});
 }
 function afterOwnChange(mon){
   // recompute forms present and repaint detail (keeps cache)
@@ -910,7 +1019,7 @@ async function openCardPicker(mon, form){
     <button class="btn ghost" id="pkNoCard" style="width:100%;margin-top:10px;justify-content:center;text-align:center">${owned?'Marcar sem carta':'Marcar como tido (escolher carta depois)'}</button>
   `);
   scrim.querySelector('#pkNoCard').onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); renderGrid(); close(); toast('Marcado ✔'); };
-  const rmBtn=scrim.querySelector('#pkRemove'); if(rmBtn) rmBtn.onclick=()=>{ delete collection[sid]; saveCollection(); renderGrid(); close(); toast('Removido'); };
+  const rmBtn=scrim.querySelector('#pkRemove'); if(rmBtn) rmBtn.onclick=()=>{ if(collection[sid]&&collection[sid].cardId) removeOwnedCard(collection[sid].cardId); delete collection[sid]; saveCollection(); renderGrid(); close(); toast('Removido'); };
   const listEl=scrim.querySelector('#pkList');
   let cards=[];
   try{
@@ -919,9 +1028,7 @@ async function openCardPicker(mon, form){
     cards=byForm[form]||[];
   }catch(e){ listEl.innerHTML='<div class="errbox">Sem ligação. Fecha e tenta outra vez.</div>'; return; }
   if(!cards.length){ listEl.innerHTML='<div class="errbox">Ainda não há cartas desta forma na base de dados. Podes marcar como tido em baixo.</div>'; return; }
-  const pick=c=>{ const p=priceMap[c.id];
-    collection[slotId(mon.n,form)]={cardId:c.id,name:c.name,setName:c.set.name,image:c.image,rarity:c.rarity,no:cardNo(c),price:p&&p.value!=null?p:null,cur:p&&p.cur,addedAt:Date.now()};
-    saveCollection(); renderGrid(); close(); toast('Guardado ✔ '+c.name); };
+  const pick=c=>{ close(); openCardEditor({id:c.id,name:c.name,image:c.image,localId:c.localId,set:c.set,rarity:c.rarity,dexId:[mon.n],lang:c.lang}, ()=>renderGrid(), {setAsRep:true}); };
   function draw(q){
     const list=(q?cards.filter(c=>cardMatches(c,q)):cards.slice())
       .sort((a,b)=>{ const va=(priceMap[a.id]&&priceMap[a.id].value)??-1, vb=(priceMap[b.id]&&priceMap[b.id].value)??-1; if(vb!==va) return vb-va; return rarityRank(a.rarity)-rarityRank(b.rarity); });
@@ -1033,11 +1140,11 @@ async function fetchCardFull(id){ try{ const r=await fetch(`https://api.tcgdex.n
 let _setsList=null;
 async function fetchSetsList(){
   if(_setsList) return _setsList;
-  const cached=await idbGet('setslist');
+  const cached=await idbGet('setslist2');
   if(cached && cached.list && (Date.now()-cached.ts)<30*DAY){ _setsList=cached.list; return _setsList; }
   try{ const r=await fetch('https://api.tcgdex.net/v2/en/sets'); const arr=await r.json();
-    _setsList=arr.map(s=>({id:s.id, name:s.name, code:SETCODES[s.id]||''})).reverse();  // recentes primeiro
-    idbSet('setslist',{list:_setsList, ts:Date.now()});
+    _setsList=arr.map(s=>({id:s.id, name:s.name, code:SETCODES[s.id]||'', cnt:(s.cardCount&&s.cardCount.official)||0})).reverse();  // recentes primeiro
+    idbSet('setslist2',{list:_setsList, ts:Date.now()});
   }catch(e){ _setsList=[]; }
   return _setsList;
 }
@@ -1161,17 +1268,145 @@ function showScanCard(ov, card, retry, close){
   res.querySelector('#scanNo').onclick=retry;
   res.querySelector('#scanYes').onclick=()=>{
     if(!mon) return;
+    addOwnedCard({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:card.dexId,lang:'en'}, {});
+    if(price!=null && owned[card.id]){ owned[card.id].mkt={value:price,cur:'EUR'}; owned[card.id].mktTs=Date.now(); saveOwned(); }
     const form=detectForm(card.name);
     collection[slotId(mon.n,form)]={cardId:card.id, name:card.name, setName:(card.set&&card.set.name)||'', image:card.image, rarity:card.rarity, no:(card.localId||'')+total, price:price!=null?{value:price,cur:'EUR'}:null, cur:'EUR', addedAt:Date.now()};
     saveCollection(); renderGrid(); close(); toast('Adicionado ✔ '+card.name);
   };
 }
 
+/* ============================ Sets & Wallet views ============================ */
+const fmtEur = v => '€'+ (v>=1000 ? Math.round(v).toLocaleString('pt-PT') : (v||0).toFixed(2));
+
+async function renderSets(){
+  const el=document.getElementById('setsView');
+  el.innerHTML=`<div class="vhead"><h1>Coleções</h1><p id="setsSummary" class="vsub">a carregar…</p></div>
+    <div class="search" style="margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="setsSearch" type="search" placeholder="Procurar coleção (151, 30th, Surging…)" autocomplete="off"></div>
+    <div id="setsList" class="setcards"><div class="loader"><div class="spin"></div></div></div>`;
+  const sets=await fetchSetsList();
+  const stats={}; let totalCards=0;
+  for(const id in owned){ const c=owned[id]; (stats[c.setId]=stats[c.setId]||{n:0,val:0}); stats[c.setId].n+=(c.qty||1); stats[c.setId].val+=cardTotalValue(c); totalCards+=(c.qty||1); }
+  const mySets=sets.filter(s=>stats[s.id]).sort((a,b)=>stats[b.id].val-stats[a.id].val);
+  document.getElementById('setsSummary').textContent=`${totalCards} carta${totalCards!==1?'s':''} · ${mySets.length} coleções · ${fmtEur(walletTotal())}`;
+  const listEl=document.getElementById('setsList');
+  const row=s=>{ const st=stats[s.id]; return `<button class="setcard ${st?'has':''}" data-set="${s.id}">
+    <div class="sc-main"><b>${s.name}</b><span>${s.code?s.code+' · ':''}${st?(st.n+'/'+(s.cnt||'?')):(s.cnt||'?')} cartas</span></div>
+    ${st?('<div class="sc-val">'+fmtEur(st.val)+'</div>'):'<div class="sc-add">＋</div>'}</button>`; };
+  const draw=q=>{ const ql=(q||'').toLowerCase();
+    const filt=ql?sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql)):null;
+    let html='';
+    if(!filt){ if(mySets.length) html+='<div class="seclabel">As tuas coleções</div>'+mySets.map(row).join(''); html+='<div class="seclabel">Todas as coleções</div>'+sets.filter(s=>!stats[s.id]).slice(0,70).map(row).join(''); }
+    else html=filt.slice(0,90).map(row).join('')||'<div class="empty">Nada encontrado.</div>';
+    listEl.innerHTML=html;
+    listEl.querySelectorAll('[data-set]').forEach(b=> b.onclick=()=>{ location.hash='set-'+encodeURIComponent(b.dataset.set); });
+  };
+  draw('');
+  const si=document.getElementById('setsSearch'); let t=null; si.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>draw(si.value.trim()),150); });
+}
+
+async function renderSetDetail(setId){
+  showView('detail');
+  const el=document.getElementById('detailView'); window.scrollTo(0,0);
+  el.innerHTML=`<div class="dtop"><button class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button><div class="dtitle"><div class="num">COLEÇÃO</div><h1>…</h1></div></div><div class="loader"><div class="spin"></div><span>A carregar coleção…</span></div>`;
+  el.querySelector('#backBtn').onclick=()=>{ location.hash='sets'; };
+  let set; try{ const r=await fetch('https://api.tcgdex.net/v2/en/sets/'+setId); set=await r.json(); }catch(e){ el.querySelector('.loader').outerHTML='<div class="errbox">Sem ligação.</div>'; return; }
+  const cards=set.cards||[]; const total=(set.cardCount&&set.cardCount.official)||cards.length;
+  const paint=()=>{
+    let n=0,val=0; cards.forEach(c=>{ if(owned[c.id]){ n+=owned[c.id].qty||1; val+=cardTotalValue(owned[c.id]); } });
+    el.innerHTML=`<div class="dtop"><button class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="dtitle"><div class="num tnum">${SETCODES[setId]?SETCODES[setId]+' · ':''}${total} cartas</div><h1>${set.name}</h1></div></div>
+      <div class="setmeta"><b>${n}</b>/${total} cartas · <b>${fmtEur(val)}</b></div>
+      <div class="cgrid">${cards.map(c=>setCardHTML(c,set)).join('')}</div>`;
+    el.querySelector('#backBtn').onclick=()=>{ location.hash='sets'; };
+    el.querySelectorAll('[data-c]').forEach(b=> b.onclick=()=>{ const c=cards.find(x=>x.id===b.dataset.c);
+      openCardEditor({id:c.id,name:c.name,image:c.image,localId:c.localId,set:{name:set.name,cardCount:set.cardCount},rarity:c.rarity,lang:'en'}, paint); });
+  };
+  paint();
+}
+function setCardHTML(c,set){
+  const o=owned[c.id]; const no=c.localId?(c.localId+(set.cardCount&&set.cardCount.official?('/'+set.cardCount.official):'')):'';
+  const u=o?cardUnitValue(o):null;
+  return `<div class="ccard ${o?'mine-card':''}">
+    <div class="ci">${c.image?`<img loading="lazy" decoding="async" src="${cardImg(c.image,'low')}" alt="${c.name}" onerror="this.style.display='none';this.nextElementSibling.hidden=false"><div class="ph" hidden>Sem imagem</div>`:'<div class="ph">Sem imagem</div>'}
+      ${o?('<div class="topbadges"><span class="ribbon top">✔'+((o.qty||1)>1?(' '+o.qty+'×'):'')+'</span>'+(o.grade&&o.grade!=='raw'?('<span class="ribbon art">'+o.grade+'</span>'):'')+'</div>'):''}</div>
+    <div class="info"><div class="cset tnum">${no}</div><div class="cname">${c.name}</div>
+      <div class="rar">${o?(u?fmtPrice(u):'—'):(c.rarity||'—')}</div></div>
+    <div class="cacts"><button class="btn sm ${o?'gold':'pri'}" data-c="${c.id}">${o?'Editar':'Tenho'}</button></div></div>`;
+}
+
+async function openCardEditor(card, onDone, opts){
+  const o=owned[card.id];
+  const {scrim,close}=openSheet(`<h3>${o?'Editar carta':'Adicionar carta'}</h3>
+    <div class="ed-card"><div class="ed-img"><img src="${card.image?cardImg(card.image,'low'):PLACEHOLDER}" onerror="this.src='${PLACEHOLDER}'"></div>
+      <div class="ed-meta"><b>${card.name}</b><span>${(card.set&&card.set.name)||''} ${card.localId?('· '+card.localId):''}</span><span class="ed-mkt" id="edMkt">mercado: …</span></div></div>
+    <div class="ed-row"><label>Quantidade</label><div class="stepper"><button id="qMinus" type="button">−</button><span id="qVal">${o?o.qty:1}</span><button id="qPlus" type="button">＋</button></div></div>
+    <div class="ed-row"><label>Avaliação</label><select id="edGrade">${GRADES.map(g=>`<option value="${g}" ${o&&o.grade===g?'selected':''}>${g==='raw'?'Sem avaliação (raw)':g}</option>`).join('')}</select></div>
+    <div class="ed-row"><label>Valor €<br><small>opcional; p/ avaliadas mete à mão</small></label><input id="edVal" inputmode="decimal" placeholder="usar preço de mercado" value="${o&&o.value!=null?o.value:''}"></div>
+    <div class="ed-actions">${o?'<button class="btn danger sm" id="edRemove">Remover</button>':''}<button class="btn gold" id="edSave" style="flex:1;justify-content:center">${o?'Guardar':'Adicionar'}</button></div>`);
+  let qty=o?o.qty:1; const qEl=scrim.querySelector('#qVal');
+  scrim.querySelector('#qMinus').onclick=()=>{ qty=Math.max(1,qty-1); qEl.textContent=qty; };
+  scrim.querySelector('#qPlus').onclick=()=>{ qty++; qEl.textContent=qty; };
+  let full=null; try{ full=await fetchCardFull(card.id); }catch(e){}
+  const cm=full&&full.pricing&&full.pricing.cardmarket; const mkt=cm?(cm.trend??cm.avg??cm.low):null;
+  const mktEl=scrim.querySelector('#edMkt'); if(mktEl) mktEl.textContent = mkt!=null?('mercado: €'+mkt.toFixed(2)):'mercado: —';
+  const vEl=scrim.querySelector('#edVal'); if(vEl&&mkt!=null) vEl.placeholder='ex. '+mkt.toFixed(2)+' (mercado)';
+  scrim.querySelector('#edSave').onclick=()=>{
+    const grade=scrim.querySelector('#edGrade').value; const vv=(vEl.value||'').trim().replace(',','.'); const value=vv?parseFloat(vv):null;
+    const data={ id:card.id, name:card.name, image:card.image, localId:card.localId, set:card.set, rarity:(full&&full.rarity)||card.rarity, dexId:(full&&full.dexId)||card.dexId||[], lang:card.lang||'en' };
+    const rec=addOwnedCard(data,{qty,grade,value});
+    if(rec && (!rec.mkt||rec.mkt.value==null) && mkt!=null){ rec.mkt={value:mkt,cur:'EUR',avg7:cm.avg7,avg30:cm.avg30}; rec.mktTs=Date.now(); saveOwned(); }
+    if(data.dexId&&data.dexId.length){ const sid=slotId(data.dexId[0],detectForm(card.name)); if((opts&&opts.setAsRep)||!collection[sid]){ collection[sid]={cardId:card.id,name:card.name,setName:(card.set&&card.set.name)||'',image:card.image,rarity:data.rarity,no:(card.localId||''),price:mkt!=null?{value:mkt,cur:'EUR'}:null,addedAt:Date.now()}; saveCollection(); } }
+    close(); toast('Guardado ✔'); onDone&&onDone();
+  };
+  const rm=scrim.querySelector('#edRemove'); if(rm) rm.onclick=()=>{ removeOwnedCard(card.id);
+    const dx=(full&&full.dexId)||card.dexId; if(dx&&dx.length){ const sid=slotId(dx[0],detectForm(card.name)); if(collection[sid]&&collection[sid].cardId===card.id){ delete collection[sid]; saveCollection(); } }
+    close(); toast('Removido'); onDone&&onDone(); };
+}
+
+async function renderWallet(){
+  const el=document.getElementById('walletView');
+  if(!Object.keys(owned).length){ el.innerHTML=`<div class="vhead"><h1>Carteira</h1></div><div class="empty"><b>Ainda sem cartas</b><br>Marca cartas na Pokédex ou nas Coleções — o valor aparece aqui.</div>`; return; }
+  el.innerHTML=`<div class="vhead"><h1>Carteira</h1><p class="vsub" id="wSub"></p></div>
+    <div class="wtotal"><div class="wt-val" id="wTotal">${fmtEur(walletTotal())}</div><div class="wt-move" id="wMove"></div></div>
+    <div id="wProg" class="wprog"></div><div id="wBody"></div>`;
+  await refreshOwnedPrices((d,t)=>{ const p=document.getElementById('wProg'); if(p) p.textContent=d<t?`a atualizar preços ${d}/${t}…`:''; const wt=document.getElementById('wTotal'); if(wt) wt.textContent=fmtEur(walletTotal()); });
+  const pr=document.getElementById('wProg'); if(pr) pr.textContent='';
+  paintWallet();
+}
+function paintWallet(){
+  const body=document.getElementById('wBody'); if(!body) return;
+  const cards=Object.values(owned);
+  let total=0,count=0,graded=0,tot7=0,cur7=0,tot30=0,cur30=0; const bySet={};
+  for(const c of cards){ const tv=cardTotalValue(c); total+=tv; count+=c.qty||1; if(c.grade&&c.grade!=='raw') graded+=c.qty||1;
+    bySet[c.setId]=bySet[c.setId]||{name:c.setName||c.setId,val:0,n:0}; bySet[c.setId].val+=tv; bySet[c.setId].n+=c.qty||1;
+    if(c.value==null && c.mkt && c.mkt.value!=null){ const q=c.qty||1, v=c.mkt.value; if(c.mkt.avg7!=null){cur7+=v*q;tot7+=c.mkt.avg7*q;} if(c.mkt.avg30!=null){cur30+=v*q;tot30+=c.mkt.avg30*q;} }
+  }
+  document.getElementById('wTotal').textContent=fmtEur(total);
+  document.getElementById('wSub').textContent=`${count} carta${count!==1?'s':''}${graded?(' · '+graded+' avaliadas'):''} · ${Object.keys(bySet).length} coleções`;
+  const pct=(cur,prev)=>prev>0?((cur-prev)/prev*100):null; const d7=pct(cur7,tot7),d30=pct(cur30,tot30);
+  const chip=(l,d)=>d==null?'':`<span class="mchip ${d>=0?'up':'down'}">${l} ${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</span>`;
+  document.getElementById('wMove').innerHTML=chip('7d',d7)+chip('30d',d30);
+  const setsArr=Object.entries(bySet).sort((a,b)=>b[1].val-a[1].val);
+  const top=cards.filter(c=>cardUnitValue(c)).sort((a,b)=>cardTotalValue(b)-cardTotalValue(a)).slice(0,10);
+  body.innerHTML=`<div class="seclabel">Valor por coleção</div>
+    <div class="wsetlist">${setsArr.slice(0,12).map(([sid,s])=>`<div class="wsetrow"><span class="wsr-n">${s.name}</span><span class="wsr-c tnum">${s.n}</span><span class="wsr-v tnum">${fmtEur(s.val)}</span></div>`).join('')}</div>
+    <div class="seclabel">Cartas mais valiosas</div>
+    <div class="wtoplist">${top.map(c=>{ const u=cardUnitValue(c); return `<div class="wtop"><div class="wt-img"><img loading="lazy" src="${c.image?cardImg(c.image,'low'):PLACEHOLDER}" onerror="this.src='${PLACEHOLDER}'"></div>
+      <div class="wt-m"><b>${c.name}</b><span>${c.setName||''} ${c.no?('· '+c.no):''}${c.grade&&c.grade!=='raw'?(' · '+c.grade):''}</span></div>
+      <div class="wt-v tnum">${fmtEur(cardTotalValue(c))}${(c.qty||1)>1?('<small>'+c.qty+'×</small>'):(u&&u.manual?'<small>manual</small>':'')}</div></div>`; }).join('')}</div>
+    <p class="wnote">Preços raw do Cardmarket (via TCGdex). Avaliadas usam o valor que meteste. Movimento = média 7/30 dias vs. agora.</p>`;
+}
+
 /* ============================ router ============================ */
 function route(){
   const h=location.hash.replace('#','');
-  const m=h.match(/^p(\d+)(?:-([a-z]+))?$/);
-  if(m){ renderDetail(+m[1], m[2]||null); }
+  let m;
+  if(m=h.match(/^p(\d+)(?:-([a-z]+))?$/)){ renderDetail(+m[1], m[2]||null); }
+  else if(m=h.match(/^set-(.+)$/)){ renderSetDetail(decodeURIComponent(m[1])); }
+  else if(h==='sets'){ curDex=null; showView('sets'); renderSets(); }
+  else if(h==='wallet'){ curDex=null; showView('wallet'); renderWallet(); }
   else { showView('home'); curDex=null; renderGrid(); }   // refresh so ownership marked in detail shows on the list
 }
 window.addEventListener('hashchange', route);
@@ -1196,6 +1431,9 @@ async function boot(){
     document.getElementById('grid').innerHTML = '<div class="errbox">Não consegui carregar a lista base. Recarrega a página.</div>'; return;
   }
   document.getElementById('scanFab').onclick=openScan;
+  document.getElementById('botnav').addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(!b) return;
+    const t=b.dataset.tab; const target = t==='dex'?'':(t==='sets'?'sets':'wallet');
+    if(location.hash.replace('#','')===target) route(); else location.hash=target; });
   renderGrid();
   route();
   if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
