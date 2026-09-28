@@ -501,12 +501,13 @@ function addOwnedCard(card, opts){
 function removeLot(key){ if(owned[key]){ delete owned[key]; saveOwned(); rebuildOwnedIndex(); } }
 function removeOwnedCard(id){ let ch=false; for(const k of Object.keys(owned)){ if(owned[k].id===id){ delete owned[k]; ch=true; } } if(ch){ saveOwned(); rebuildOwnedIndex(); } }
 const VARIANT_LABEL={normal:'Normal', holo:'Holo', reverse:'Reverse Holo', firstEdition:'1ª Edição'};
-function extractPrices(pr){   // → {base, foil}  (base = normal/holo; foil = reverse holo)
+const USD_EUR = 0.92;   // conversão aproximada p/ cartas sem preço Cardmarket (só TCGplayer, em USD) → tudo fica em €
+function extractPrices(pr){   // → {base, foil}  (base = normal/holo; foil = reverse holo), sempre em EUR
   const cm=pr&&pr.cardmarket, tp=pr&&pr.tcgplayer; let base=null, foil=null;
-  if(cm){ if((cm.trend??cm.avg??cm.low)!=null) base={value:cm.trend??cm.avg??cm.low,cur:'EUR',avg7:cm.avg7,avg30:cm.avg30};
-    if((cm['trend-holo']??cm['avg-holo']??cm['low-holo'])!=null) foil={value:cm['trend-holo']??cm['avg-holo']??cm['low-holo'],cur:'EUR',avg7:cm['avg7-holo'],avg30:cm['avg30-holo']}; }
-  if(tp){ if(!base){ let mp=null; for(const k of ['holofoil','normal','1st-edition-holofoil']){ if(tp[k]&&tp[k].marketPrice!=null){mp=tp[k].marketPrice;break;} } if(mp==null) for(const k in tp){ if(tp[k]&&typeof tp[k]==='object'&&tp[k].marketPrice!=null){mp=tp[k].marketPrice;break;} } if(mp!=null) base={value:mp,cur:'USD'}; }
-    if(!foil && tp['reverse-holofoil']&&tp['reverse-holofoil'].marketPrice!=null) foil={value:tp['reverse-holofoil'].marketPrice,cur:'USD'}; }
+  if(cm){ if((cm.trend??cm.avg??cm.low)!=null) base={value:cm.trend??cm.avg??cm.low,cur:'EUR',avg7:cm.avg7,avg30:cm.avg30,updated:cm.updated};
+    if((cm['trend-holo']??cm['avg-holo']??cm['low-holo'])!=null) foil={value:cm['trend-holo']??cm['avg-holo']??cm['low-holo'],cur:'EUR',avg7:cm['avg7-holo'],avg30:cm['avg30-holo'],updated:cm.updated}; }
+  if(tp){ if(!base){ let mp=null; for(const k of ['holofoil','normal','1st-edition-holofoil']){ if(tp[k]&&tp[k].marketPrice!=null){mp=tp[k].marketPrice;break;} } if(mp==null) for(const k in tp){ if(tp[k]&&typeof tp[k]==='object'&&tp[k].marketPrice!=null){mp=tp[k].marketPrice;break;} } if(mp!=null) base={value:+(mp*USD_EUR).toFixed(2),cur:'EUR',approx:true}; }
+    if(!foil && tp['reverse-holofoil']&&tp['reverse-holofoil'].marketPrice!=null) foil={value:+(tp['reverse-holofoil'].marketPrice*USD_EUR).toFixed(2),cur:'EUR',approx:true}; }
   return {base, foil};
 }
 function priceForVariant(mkt, variant){
@@ -574,7 +575,7 @@ async function fetchDexCards(n){
 async function fetchDetail(card, force){
   const id = typeof card==='string' ? card : card.id;
   const lang = (typeof card==='object' && card.lang) || 'en';
-  const key = 'det:'+id;
+  const key = 'det2:'+id;
   const c = await idbGet(key);
   if (!force && c && (Date.now()-c.ts) < 1*DAY) return c.val;
   let val = {price:null};
@@ -730,7 +731,7 @@ function showView(which){   // 'home'(dex) | 'sets' | 'wallet' | 'detail'
   document.getElementById('detailView').hidden = which!=='detail';
   document.getElementById('topbar').hidden = which==='detail';   // no detalhe, a barra ‹ voltar é o topo fixo
   const fab=document.getElementById('scanFab'); if(fab) fab.hidden = !(which==='home'||which==='sets');
-  const nav=document.getElementById('botnav'); if(nav) nav.hidden = which==='detail';
+  const nav=document.getElementById('botnav'); if(nav) nav.hidden = false;   // sempre visível (navegação garantida, também no detalhe)
   if(which!=='detail'){ const tab=which==='home'?'dex':which; document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
   document.getElementById('brandtxt').textContent = which==='home'?'Pokédex Collector':which==='sets'?'Coleções':which==='wallet'?'Carteira':'';
 }
@@ -1529,7 +1530,15 @@ async function boot(){
     if(location.hash.replace('#','')===target) route(); else location.hash=target; });
   renderGrid();
   route();
-  if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+  if('serviceWorker' in navigator){
+    let reloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!reloaded){ reloaded=true; location.reload(); } });
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.addEventListener('updatefound', ()=>{ const nw=reg.installing; if(nw) nw.addEventListener('statechange', ()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) nw.postMessage&&nw.postMessage('skip'); }); });
+      try{ reg.update(); }catch(e){}
+      setInterval(()=>{ try{ reg.update(); }catch(e){} }, 60000);   // verifica atualizações a cada minuto
+    }).catch(()=>{});
+  }
 }
 boot();
 </script>
