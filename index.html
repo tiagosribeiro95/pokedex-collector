@@ -307,6 +307,13 @@ main{padding-bottom:68px}
 .sc-main span{font-size:12px;color:var(--muted)}
 .sc-val{font-family:Sora;font-weight:700;font-size:14px;color:var(--accent-ink)}
 .sc-add{width:30px;height:30px;border-radius:9px;background:var(--surface-2);color:var(--muted);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+.serieblk{border-bottom:1px solid var(--line)}
+.serierow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:13px 4px}
+.sr-chev{color:var(--faint);font-size:17px;transition:transform .15s;display:inline-block;width:14px}
+.serierow.open .sr-chev{transform:rotate(90deg)}
+.sr-name{flex:1;font-family:Sora;font-weight:600;font-size:14.5px}
+.sr-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+.serieSets{display:flex;flex-direction:column;gap:8px;padding:2px 0 12px 14px}
 .setmeta{font-size:13px;color:var(--muted);margin:2px 0 12px}
 .setmeta b{color:var(--ink)}
 .wtotal{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);text-align:center;margin-bottom:8px}
@@ -1309,28 +1316,59 @@ function showScanCard(ov, card, retry, close){
 /* ============================ Sets & Wallet views ============================ */
 const fmtEur = v => '€'+ (v>=1000 ? Math.round(v).toLocaleString('pt-PT') : (v||0).toFixed(2));
 
+let _seriesData=null;
+async function fetchSeriesData(){   // agrupar sets por série (ex. Sword & Shield → os seus sets)
+  if(_seriesData) return _seriesData;
+  const c=await idbGet('seriesdata');
+  if(c && c.d && (Date.now()-c.ts)<30*DAY){ _seriesData=c.d; return _seriesData; }
+  try{
+    const list=await fetch('https://api.tcgdex.net/v2/en/series').then(r=>r.json());
+    const setToSeries={}, seriesList=[];
+    await pool(list, async s=>{ try{ const det=await fetch('https://api.tcgdex.net/v2/en/series/'+s.id).then(r=>r.json());
+      const setIds=(det.sets||[]).map(x=>x.id); setIds.forEach(id=>setToSeries[id]=s.id);
+      seriesList.push({id:s.id,name:s.name,releaseDate:det.releaseDate||'',setIds});
+    }catch(e){ seriesList.push({id:s.id,name:s.name,releaseDate:'',setIds:[]}); } }, 8);
+    seriesList.sort((a,b)=>(b.releaseDate||'').localeCompare(a.releaseDate||''));   // séries mais recentes primeiro
+    _seriesData={seriesList,setToSeries}; idbSet('seriesdata',{d:_seriesData,ts:Date.now()});
+  }catch(e){ _seriesData={seriesList:[],setToSeries:{}}; }
+  return _seriesData;
+}
 async function renderSets(){
   const el=document.getElementById('setsView');
   el.innerHTML=`<div class="vhead"><h1>Coleções</h1><p id="setsSummary" class="vsub">a carregar…</p></div>
     <div class="search" style="margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-      <input id="setsSearch" type="search" placeholder="Procurar coleção (151, 30th, Surging…)" autocomplete="off"></div>
+      <input id="setsSearch" type="search" placeholder="Procurar coleção (151, Neo, Base…)" autocomplete="off"></div>
     <div id="setsList" class="setcards"><div class="loader"><div class="spin"></div></div></div>`;
-  const sets=await fetchSetsList();
+  const [sets, sd]=await Promise.all([fetchSetsList(), fetchSeriesData()]);
+  const setById={}; sets.forEach(s=>setById[s.id]=s);
   const stats={}; let totalCards=0;
-  for(const id in owned){ const c=owned[id]; (stats[c.setId]=stats[c.setId]||{n:0,val:0}); stats[c.setId].n+=(c.qty||1); stats[c.setId].val+=cardTotalValue(c); totalCards+=(c.qty||1); }
+  for(const k in owned){ const c=owned[k]; (stats[c.setId]=stats[c.setId]||{n:0,val:0}); stats[c.setId].n+=(c.qty||1); stats[c.setId].val+=cardTotalValue(c); totalCards+=(c.qty||1); }
   const mySets=sets.filter(s=>stats[s.id]).sort((a,b)=>stats[b.id].val-stats[a.id].val);
   document.getElementById('setsSummary').textContent=`${totalCards} carta${totalCards!==1?'s':''} · ${mySets.length} coleções · ${fmtEur(walletTotal())}`;
   const listEl=document.getElementById('setsList');
   const row=s=>{ const st=stats[s.id]; return `<button class="setcard ${st?'has':''}" data-set="${s.id}">
     <div class="sc-main"><b>${s.name}</b><span>${s.code?s.code+' · ':''}${st?(st.n+'/'+(s.cnt||'?')):(s.cnt||'?')} cartas</span></div>
     ${st?('<div class="sc-val">'+fmtEur(st.val)+'</div>'):'<div class="sc-add">＋</div>'}</button>`; };
+  const orphan=sets.filter(s=>!sd.setToSeries[s.id]);
+  const serieBlk=(name,id,seSets)=>{ const val=seSets.reduce((a,x)=>a+(stats[x.id]?stats[x.id].val:0),0);
+    return `<div class="serieblk"><button class="serierow" data-serie="${id}"><span class="sr-chev">›</span><span class="sr-name">${name}</span><span class="sr-meta">${seSets.length} sets${val>0?(' · '+fmtEur(val)):''}</span></button><div class="serieSets" id="ser-${id}" hidden></div></div>`; };
   const draw=q=>{ const ql=(q||'').toLowerCase();
-    const filt=ql?sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql)):null;
+    if(ql){ const filt=sets.filter(s=>s.name.toLowerCase().includes(ql)||(s.code||'').toLowerCase().includes(ql));
+      listEl.innerHTML=filt.slice(0,120).map(row).join('')||'<div class="empty">Nada encontrado.</div>'; return; }
     let html='';
-    if(!filt){ if(mySets.length) html+='<div class="seclabel">As tuas coleções</div>'+mySets.map(row).join(''); html+='<div class="seclabel">Todas as coleções</div>'+sets.filter(s=>!stats[s.id]).slice(0,70).map(row).join(''); }
-    else html=filt.slice(0,90).map(row).join('')||'<div class="empty">Nada encontrado.</div>';
+    if(mySets.length) html+='<div class="seclabel">As tuas coleções</div>'+mySets.map(row).join('');
+    html+='<div class="seclabel">Todas as séries</div>';
+    html+=sd.seriesList.map(se=>serieBlk(se.name, se.id, se.setIds.map(x=>setById[x]).filter(Boolean))).join('');
+    if(orphan.length) html+=serieBlk('Outras', '__other', orphan);
     listEl.innerHTML=html;
-    listEl.querySelectorAll('[data-set]').forEach(b=> b.onclick=()=>{ location.hash='set-'+encodeURIComponent(b.dataset.set); });
+  };
+  listEl.onclick=e=>{ const setBtn=e.target.closest('.setcard[data-set]');
+    if(setBtn){ location.hash='set-'+encodeURIComponent(setBtn.dataset.set); return; }
+    const ser=e.target.closest('.serierow'); if(!ser) return;
+    const id=ser.dataset.serie, box=document.getElementById('ser-'+id), open=!box.hidden;
+    box.hidden=open; ser.classList.toggle('open',!open);
+    if(!open && !box.dataset.filled){ const seSets=id==='__other'?orphan:((sd.seriesList.find(x=>x.id===id)||{setIds:[]}).setIds.map(x=>setById[x]).filter(Boolean));
+      box.innerHTML=seSets.map(row).join('')||'<div style="padding:8px;color:var(--muted);font-size:12px">Sem sets.</div>'; box.dataset.filled='1'; }
   };
   draw('');
   const si=document.getElementById('setsSearch'); let t=null; si.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>draw(si.value.trim()),150); });
