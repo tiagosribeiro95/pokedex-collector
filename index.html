@@ -419,6 +419,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
+const APP_VER = 'v22 · 28/09';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -1118,7 +1119,7 @@ document.getElementById('menuBtn').onclick = ()=>{
     <button class="opt" id="exportBtn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></div><div class="tx"><b>Exportar backup</b><span>guardar a coleção num ficheiro</span></div></button>
     <label class="opt" for="importFile" style="cursor:pointer"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 7V5a2 2 0 012-2h12a2 2 0 012 2v2"/></svg></div><div class="tx"><b>Importar backup</b><span>restaurar de um ficheiro</span></div><input id="importFile" type="file" accept="application/json" hidden></label>
     <div style="height:6px"></div>
-    <p class="s" style="text-align:center;margin:6px 0 0">Preços: Cardmarket via TCGdex · imagens PokéAPI/TCGdex</p>
+    <p class="s" style="text-align:center;margin:6px 0 0">Preços: Cardmarket via TCGdex · imagens PokéAPI/TCGdex<br><b>Versão ${APP_VER}</b></p>
   `);
   scrim.querySelector('#segImg').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b)return; settings.listImage=b.dataset.v; saveSettings(); scrim.querySelectorAll('#segImg button').forEach(x=>x.classList.toggle('on',x===b)); renderGrid(); };
   scrim.querySelector('#segTheme').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b)return; settings.theme=b.dataset.v; saveSettings(); applyTheme(); scrim.querySelectorAll('#segTheme button').forEach(x=>x.classList.toggle('on',x===b)); };
