@@ -419,7 +419,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v22 · 28/09';
+const APP_VER = 'v24 · 28/09';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -1538,12 +1538,10 @@ async function boot(){
     }).catch(()=>{});
   }
   if('serviceWorker' in navigator){
-    let reloaded=false;
-    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!reloaded){ reloaded=true; location.reload(); } });
+    // atualização SUAVE: ativa a nova versão em segundo plano; aplica-se na próxima abertura (sem recarregar a meio → sem loops/ecrã preto)
     navigator.serviceWorker.register('sw.js').then(reg=>{
-      reg.addEventListener('updatefound', ()=>{ const nw=reg.installing; if(nw) nw.addEventListener('statechange', ()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) nw.postMessage&&nw.postMessage('skip'); }); });
-      try{ reg.update(); }catch(e){}
-      setInterval(()=>{ try{ reg.update(); }catch(e){} }, 60000);   // verifica atualizações a cada minuto
+      reg.addEventListener('updatefound', ()=>{ const nw=reg.installing; if(nw) nw.addEventListener('statechange', ()=>{ if(nw.state==='installed' && nw.postMessage) nw.postMessage('skip'); }); });
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ try{ reg.update(); }catch(e){} } });
     }).catch(()=>{});
   }
 }
