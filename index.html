@@ -1530,6 +1530,12 @@ async function boot(){
     if(location.hash.replace('#','')===target) route(); else location.hash=target; });
   renderGrid();
   route();
+  // atualizar preços da coleção em 2º plano ao abrir a app (só busca os que estão desatualizados)
+  if(Object.keys(owned).length){
+    refreshOwnedPrices().then(n=>{ if(n>0){ renderProgress();
+      if(!document.getElementById('walletView').hidden && document.getElementById('wBody')){ const wt=document.getElementById('wTotal'); if(wt) wt.textContent=fmtEur(walletTotal()); paintWallet(); } }
+    }).catch(()=>{});
+  }
   if('serviceWorker' in navigator){
     let reloaded=false;
     navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!reloaded){ reloaded=true; location.reload(); } });
