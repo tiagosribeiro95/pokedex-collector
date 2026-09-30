@@ -107,7 +107,9 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
   background:var(--surface-2);border:1px solid var(--line);color:var(--faint);z-index:2}
 .check svg{width:16px;height:16px}
 .tile.owned .check{background:var(--good);border-color:var(--good);color:#fff}
-.tile .ownedcard{margin-top:5px;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;min-height:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tile .ownedcard{margin-top:5px;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;min-height:14px}
+.tile .oc-nm{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tile .oc-v{flex:0 0 auto;color:var(--accent-ink);font-weight:700}
 .tile .ownedcard b{color:var(--accent-ink)}
 .tile .nocardtag{margin-top:5px;font-size:10.5px;color:var(--faint);min-height:14px}
 .empty{padding:48px 16px;text-align:center;color:var(--muted)}
@@ -420,7 +422,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v25 · 30/09';
+const APP_VER = 'v26 · 30/09';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -702,7 +704,7 @@ function tileHTML(slot){
   const df=region?` data-form="${region}"`:'';
   let sub='';
   if(owned){
-    if(own.cardId){ const v=_gridValMap[own.cardId]; const vtxt=(v!=null)?('· <b>'+fmtEur(v)+'</b>'):(own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''); sub=`<div class="ownedcard">🃏 ${own.setName||''} ${vtxt}</div>`; }
+    if(own.cardId){ const v=_gridValMap[own.cardId]; const vtxt=(v!=null)?fmtEur(v):(own.price?fmtPrice(own.price):''); sub=`<div class="ownedcard"><span class="oc-nm">🃏 ${own.setName||''}</span>${vtxt?('<b class="oc-v">'+vtxt+'</b>'):''}</div>`; }
     else sub=`<div class="nocardtag">✔ tenho · sem carta</div>`;
   } else sub=`<div class="nocardtag"></div>`;
   return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''} ${region?'reg-tile':''}" data-n="${mon.n}"${df}>
