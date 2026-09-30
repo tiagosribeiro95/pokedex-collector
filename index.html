@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Pokédex Collector</title>
 <meta name="description" content="Completa a tua Pokédex em cartas: marca o que tens e descobre as cartas mais valiosas de cada Pokémon.">
 <meta name="theme-color" content="#14161c">
@@ -52,6 +52,7 @@ body{
 img{max-width:100%; display:block}
 button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 input{font:inherit}
+input,select,textarea{font-size:16px!important}   /* evita o zoom automático do iOS ao focar campos */
 a{color:var(--info); text-decoration:none}
 [hidden]{display:none!important}
 .tnum{font-variant-numeric:tabular-nums}
@@ -419,7 +420,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v24 · 28/09';
+const APP_VER = 'v25 · 30/09';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -457,7 +458,9 @@ const slotId = (n, form) => (form && form!=='base') ? `d${n}:${form}` : `d${n}`;
 /* ---- owned cards: card-level store (wallet + sets source of truth) ---- */
 const GRADES = ['raw','PSA 10','PSA 9','PSA 8','BGS 10','BGS 9.5','BGS 9','CGC 10','CGC 9.5','CGC 9','SGC 10','Outra'];
 const setIdOf = cid => (cid && cid.indexOf('-')>=0) ? cid.slice(0, cid.lastIndexOf('-')) : (cid||'');
-const lotKey = (id, variant, grade) => id+'::'+(variant||'normal')+'::'+(grade||'raw');   // permite ter normal E reverse (e avaliações) da mesma carta
+const lotKey = (id, variant, grade, lang) => id+'::'+(variant||'normal')+'::'+(grade||'raw')+'::'+(lang||'en');   // normal E reverse, avaliações E idiomas em separado
+const LANG_NAME={en:'Inglês', pt:'Português', fr:'Francês', de:'Alemão', es:'Espanhol', it:'Italiano', ja:'Japonês', 'zh-tw':'Chinês', ko:'Coreano'};
+const langOpts=lang=> lang==='ja'?['ja']: lang==='zh-tw'?['zh-tw']: lang==='ko'?['ko']: ['en','pt','fr','de','es','it'];
 let owned = LS.get('pdc.owned', null);
 if(owned===null){                         // migração única da coleção antiga (uma carta por Pokémon)
   owned={};
@@ -470,8 +473,8 @@ if(owned===null){                         // migração única da coleção anti
   LS.set('pdc.owned', owned);
 }
 const saveOwned = () => LS.set('pdc.owned', owned);
-if(Object.keys(owned).some(k=>k.indexOf('::')<0)){   // migrar chaves antigas (por cardId) para lotes
-  const n={}; for(const k in owned){ const o=owned[k]; n[lotKey(o.id,o.variant,o.grade)]=o; } owned=n; saveOwned();
+if(Object.keys(owned).some(k=>k.split('::').length!==4)){   // normalizar chaves antigas para lotes de 4 partes (id::variante::avaliação::idioma)
+  const n={}; for(const k in owned){ const o=owned[k]; n[lotKey(o.id,o.variant,o.grade,o.lang)]=o; } owned=n; saveOwned();
 }
 
 let ownedByDex={};
@@ -484,8 +487,8 @@ function ownedHasCard(id){ return Object.values(owned).some(o=>o.id===id); }
 function defaultVariant(card){ const v=card&&card.variants; if(!v) return 'normal'; if(v.normal) return 'normal'; if(v.holo) return 'holo'; if(v.reverse) return 'reverse'; if(v.firstEdition) return 'firstEdition'; return 'normal'; }
 function addOwnedCard(card, opts){
   opts=opts||{}; const id=card.id; if(!id) return null;
-  const variant=opts.variant||defaultVariant(card), grade=opts.grade||'raw';
-  const key=lotKey(id,variant,grade); const ex=owned[key];
+  const variant=opts.variant||defaultVariant(card), grade=opts.grade||'raw', lang=opts.lang||card.lang||'en';
+  const key=lotKey(id,variant,grade,lang); const ex=owned[key];
   const any=ex||Object.values(owned).find(o=>o.id===id);   // metadados/preços partilham entre lotes da mesma carta
   const total=(card.set&&card.set.cardCount&&card.set.cardCount.official)?('/'+card.set.cardCount.official):'';
   owned[key]={ id, name:card.name||(ex&&ex.name)||(any&&any.name)||'', setId:setIdOf(id),
@@ -493,7 +496,7 @@ function addOwnedCard(card, opts){
     image:(card.image!==undefined?card.image:(ex&&ex.image))||(any&&any.image)||null,
     rarity:(card.rarity!==undefined?card.rarity:(ex&&ex.rarity))||(any&&any.rarity)||null,
     no:(card.localId!=null?(String(card.localId)+total):(card.no||(ex&&ex.no)||(any&&any.no)||'')),
-    dexId:(card.dexId&&card.dexId.length?card.dexId:((ex&&ex.dexId)||(any&&any.dexId)))||[], lang:card.lang||(ex&&ex.lang)||'en',
+    dexId:(card.dexId&&card.dexId.length?card.dexId:((ex&&ex.dexId)||(any&&any.dexId)))||[], lang,
     qty:(opts.qty!=null?opts.qty:(ex?ex.qty:1)), grade, variant,
     value:(opts.value!==undefined?opts.value:(ex?ex.value:null)),
     mkt:(ex?ex.mkt:(any?any.mkt:null)), mktTs:(ex?ex.mktTs:(any?any.mktTs:0)), addedAt:(ex?ex.addedAt:Date.now()) };
@@ -687,6 +690,8 @@ function gridSlots(){
   }
   return out;
 }
+let _gridValMap={};
+function ownedValueByCard(){ const m={}; for(const k in owned){ const c=owned[k]; const u=cardUnitValue(c); if(u&&u.value!=null && (!(c.id in m)||u.value>m[c.id])) m[c.id]=u.value; } return m; }
 function tileHTML(slot){
   const {mon,region,artId}=slot;
   const own=collection[slotId(mon.n,region)];
@@ -697,7 +702,7 @@ function tileHTML(slot){
   const df=region?` data-form="${region}"`:'';
   let sub='';
   if(owned){
-    if(own.cardId) sub=`<div class="ownedcard">🃏 ${own.setName||''} ${own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''}</div>`;
+    if(own.cardId){ const v=_gridValMap[own.cardId]; const vtxt=(v!=null)?('· <b>'+fmtEur(v)+'</b>'):(own.price?('· <b>'+fmtPrice(own.price)+'</b>'):''); sub=`<div class="ownedcard">🃏 ${own.setName||''} ${vtxt}</div>`; }
     else sub=`<div class="nocardtag">✔ tenho · sem carta</div>`;
   } else sub=`<div class="nocardtag"></div>`;
   return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''} ${region?'reg-tile':''}" data-n="${mon.n}"${df}>
@@ -717,6 +722,7 @@ function renderGrid(){
   const empty = document.getElementById('gridEmpty');
   if(!slots.length){ grid.innerHTML=''; empty.hidden=false; empty.innerHTML='<b>Nada por aqui</b><br>Experimenta outro filtro ou pesquisa.'; return; }
   empty.hidden=true;
+  _gridValMap=ownedValueByCard();
   grid.innerHTML = slots.map(tileHTML).join('');
   renderProgress();
 }
@@ -992,7 +998,7 @@ function choose(mon, card){
   if(collection[sid] && collection[sid].cardId===card.id){   // já é a minha → remove (toggle)
     removeOwnedCard(card.id); delete collection[sid]; saveCollection(); repaint(); toast('Removida'); return;
   }
-  openCardEditor({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:[mon.n],lang:card.lang,variants:card.variants}, repaint, {setAsRep:true});
+  openCardEditor({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:[mon.n],lang:card.lang,variants:card.variants}, ()=>{ location.hash=''; }, {setAsRep:true});
 }
 function afterOwnChange(mon){
   // recompute forms present and repaint detail (keeps cache)
@@ -1417,12 +1423,13 @@ async function openCardEditor(card, onDone, opts){
       <div class="ed-meta"><b>${card.name}</b><span>${(card.set&&card.set.name)||''} ${card.localId?('· '+card.localId):''}</span><span class="ed-mkt" id="edMkt">mercado: …</span></div></div>
     <div class="ed-lots" id="edLots"></div>
     <div class="ed-row"><label>Variante</label><select id="edVar"><option>…</option></select></div>
+    <div class="ed-row"><label>Idioma</label><select id="edLang">${langOpts(card.lang).map(l=>`<option value="${l}">${LANG_NAME[l]||l}</option>`).join('')}</select></div>
     <div class="ed-row"><label>Avaliação</label><select id="edGrade">${GRADES.map(g=>`<option value="${g}">${g==='raw'?'Sem avaliação (raw)':g}</option>`).join('')}</select></div>
     <div class="ed-row"><label>Quantidade</label><div class="stepper"><button id="qMinus" type="button">−</button><span id="qVal">1</span><button id="qPlus" type="button">＋</button></div></div>
     <div class="ed-row"><label>Valor €<br><small>opcional; p/ avaliadas mete à mão</small></label><input id="edVal" inputmode="decimal" placeholder="usar preço de mercado" value=""></div>
     <div class="ed-actions"><button class="btn danger sm" id="edRemove" hidden>Remover cópia</button><button class="btn gold" id="edSave" style="flex:1;justify-content:center">Adicionar</button></div>`);
   const qEl=scrim.querySelector('#qVal'), varSel=scrim.querySelector('#edVar'), gradeSel=scrim.querySelector('#edGrade'),
-        vEl=scrim.querySelector('#edVal'), mktEl=scrim.querySelector('#edMkt'), saveBtn=scrim.querySelector('#edSave'),
+        langSel=scrim.querySelector('#edLang'), vEl=scrim.querySelector('#edVal'), mktEl=scrim.querySelector('#edMkt'), saveBtn=scrim.querySelector('#edSave'),
         rmBtn=scrim.querySelector('#edRemove'), lotsEl=scrim.querySelector('#edLots');
   let qty=1, prices={base:null,foil:null}, full=null;
   scrim.querySelector('#qMinus').onclick=()=>{ qty=Math.max(1,qty-1); qEl.textContent=qty; };
@@ -1433,24 +1440,25 @@ async function openCardEditor(card, onDone, opts){
   const updMkt=()=>{ const p=priceForVariant(prices,varSel.value), val=p&&p.value!=null?p.value:null;
     mktEl.textContent=val!=null?('mercado: '+(p.cur==='USD'?'$':'€')+val.toFixed(2)):'mercado: —';
     vEl.placeholder=val!=null?('ex. '+val.toFixed(2)+' (mercado)'):'usar preço de mercado'; };
-  const showLots=()=>{ const lots=cardLots(card.id); lotsEl.innerHTML = lots.length? ('🗂️ Já tens: '+lots.map(l=>`${VARIANT_LABEL[l.variant]||l.variant}${l.grade&&l.grade!=='raw'?(' '+l.grade):''} ×${l.qty}`).join('  ·  ')) : ''; };
-  const refreshLot=()=>{ const lot=owned[lotKey(card.id,varSel.value,gradeSel.value)];
+  const showLots=()=>{ const lots=cardLots(card.id); lotsEl.innerHTML = lots.length? ('🗂️ Já tens: '+lots.map(l=>`${VARIANT_LABEL[l.variant]||l.variant}${l.lang&&l.lang!=='en'?(' '+(LANG_NAME[l.lang]||l.lang)):''}${l.grade&&l.grade!=='raw'?(' '+l.grade):''} ×${l.qty}`).join('  ·  ')) : ''; };
+  const refreshLot=()=>{ const lot=owned[lotKey(card.id,varSel.value,gradeSel.value,langSel.value)];
     qty=lot?lot.qty:1; qEl.textContent=qty; vEl.value=lot&&lot.value!=null?lot.value:'';
     saveBtn.textContent=lot?'Guardar':'Adicionar cópia'; rmBtn.hidden=!lot; updMkt(); };
-  populate(card.variants); if(existing[0]) gradeSel.value=existing[0].grade||'raw';
+  populate(card.variants);
+  if(existing[0]){ gradeSel.value=existing[0].grade||'raw'; if([...langSel.options].some(o=>o.value===existing[0].lang)) langSel.value=existing[0].lang; }
   showLots(); refreshLot();
-  varSel.onchange=refreshLot; gradeSel.onchange=refreshLot;
+  varSel.onchange=refreshLot; gradeSel.onchange=refreshLot; langSel.onchange=refreshLot;
   try{ full=await fetchCardFull(card.id); }catch(e){}
   if(full){ prices=extractPrices(full.pricing); if(full.variants) populate(full.variants); updMkt(); }
   saveBtn.onclick=()=>{
-    const grade=gradeSel.value, variant=varSel.value; const vv=(vEl.value||'').trim().replace(',','.'); const value=vv?parseFloat(vv):null;
-    const data={ id:card.id, name:card.name, image:card.image, localId:card.localId, set:card.set, rarity:(full&&full.rarity)||card.rarity, dexId:(full&&full.dexId)||card.dexId||[], lang:card.lang||'en', variants:(full&&full.variants)||card.variants };
-    const rec=addOwnedCard(data,{qty,grade,value,variant});
+    const grade=gradeSel.value, variant=varSel.value, lang=langSel.value; const vv=(vEl.value||'').trim().replace(',','.'); const value=vv?parseFloat(vv):null;
+    const data={ id:card.id, name:card.name, image:card.image, localId:card.localId, set:card.set, rarity:(full&&full.rarity)||card.rarity, dexId:(full&&full.dexId)||card.dexId||[], lang, variants:(full&&full.variants)||card.variants };
+    const rec=addOwnedCard(data,{qty,grade,value,variant,lang});
     if(rec && (prices.base||prices.foil)){ rec.mkt=prices; rec.mktTs=Date.now(); saveOwned(); }
     if(data.dexId&&data.dexId.length){ const sid=slotId(data.dexId[0],detectForm(card.name)); if((opts&&opts.setAsRep)||!collection[sid]){ const rp=priceForVariant(prices,variant); collection[sid]={cardId:card.id,name:card.name,setName:(card.set&&card.set.name)||'',image:card.image,rarity:data.rarity,no:(card.localId||''),price:rp&&rp.value!=null?{value:rp.value,cur:rp.cur}:null,addedAt:Date.now()}; saveCollection(); } }
     close(); toast('Guardado ✔'); onDone&&onDone();
   };
-  rmBtn.onclick=()=>{ removeLot(lotKey(card.id,varSel.value,gradeSel.value));
+  rmBtn.onclick=()=>{ removeLot(lotKey(card.id,varSel.value,gradeSel.value,langSel.value));
     const dx=(full&&full.dexId)||card.dexId; if(dx&&dx.length && !ownedHasCard(card.id)){ const sid=slotId(dx[0],detectForm(card.name)); if(collection[sid]&&collection[sid].cardId===card.id){ delete collection[sid]; saveCollection(); } }
     close(); toast('Removido'); onDone&&onDone(); };
 }
@@ -1533,7 +1541,8 @@ async function boot(){
   route();
   // atualizar preços da coleção em 2º plano ao abrir a app (só busca os que estão desatualizados)
   if(Object.keys(owned).length){
-    refreshOwnedPrices().then(n=>{ if(n>0){ renderProgress();
+    refreshOwnedPrices().then(n=>{ if(n>0){
+      if(!document.getElementById('homeView').hidden) renderGrid(); else renderProgress();
       if(!document.getElementById('walletView').hidden && document.getElementById('wBody')){ const wt=document.getElementById('wTotal'); if(wt) wt.textContent=fmtEur(walletTotal()); paintWallet(); } }
     }).catch(()=>{});
   }
