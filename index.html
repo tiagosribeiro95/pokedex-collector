@@ -422,7 +422,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v26 · 30/09';
+const APP_VER = 'v27 · 01/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -453,7 +453,9 @@ const LS = {
 };
 let collection = LS.get('pdc.collection', {});   // slotId -> {cardId,name,setName,image,rarity,price,cur,addedAt}
 let settings = Object.assign({filter:'all', gen:'all', listImage:'pokemon', sort:'value', theme:'system'}, LS.get('pdc.settings', {}));
-const saveCollection = () => LS.set('pdc.collection', collection);
+let _adopting=false, _fbUser=null, _syncT=null;   // sincronização Firebase (estado cedo para a migração não rebentar)
+let _syncedAt = +(LS.get('pdc.syncedAt',0) || 0);
+const saveCollection = () => { LS.set('pdc.collection', collection); if(!_adopting) fbPush(); };
 const saveSettings = () => LS.set('pdc.settings', settings);
 const slotId = (n, form) => (form && form!=='base') ? `d${n}:${form}` : `d${n}`;
 
@@ -474,7 +476,7 @@ if(owned===null){                         // migração única da coleção anti
   }}
   LS.set('pdc.owned', owned);
 }
-const saveOwned = () => LS.set('pdc.owned', owned);
+const saveOwned = () => { LS.set('pdc.owned', owned); if(!_adopting) fbPush(); };
 if(Object.keys(owned).some(k=>k.split('::').length!==4)){   // normalizar chaves antigas para lotes de 4 partes (id::variante::avaliação::idioma)
   const n={}; for(const k in owned){ const o=owned[k]; n[lotKey(o.id,o.variant,o.grade,o.lang)]=o; } owned=n; saveOwned();
 }
@@ -1119,6 +1121,8 @@ document.getElementById('menuBtn').onclick = ()=>{
   const {scrim,close}=openSheet(`
     <h3>Definições & backup</h3>
     <p class="s">${p.base}/${NATIONAL.length} espécies · ${p.reg}/${REG_TOTAL} regionais · ${p.other} outras formas</p>
+    <div id="acctBox">${acctHTML()}</div>
+    <div style="height:4px"></div>
     <div class="setrow"><div class="lab"><b>Imagem na lista</b><span>o que aparece em cada Pokémon</span></div>
       <div class="seg" id="segImg"><button data-v="pokemon" class="${settings.listImage==='pokemon'?'on':''}">Pokémon</button><button data-v="card" class="${settings.listImage==='card'?'on':''}">Carta que tenho</button></div></div>
     <div class="setrow"><div class="lab"><b>Tema</b><span>aspeto da app</span></div>
@@ -1133,6 +1137,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   scrim.querySelector('#segTheme').onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b)return; settings.theme=b.dataset.v; saveSettings(); applyTheme(); scrim.querySelectorAll('#segTheme button').forEach(x=>x.classList.toggle('on',x===b)); };
   scrim.querySelector('#exportBtn').onclick=()=>{ exportBackup(); close(); };
   scrim.querySelector('#importFile').onchange=e=>{ importBackup(e.target.files[0], close); };
+  wireAcct();
 };
 function exportBackup(){
   const data = JSON.stringify({app:'pokedex-collector', v:1, exported:new Date().toISOString(), collection}, null, 2);
@@ -1504,6 +1509,71 @@ function paintWallet(){
     <p class="wnote">Preços raw do Cardmarket (via TCGdex). Avaliadas usam o valor que meteste. Movimento = média 7/30 dias vs. agora.</p>`;
 }
 
+/* ============================ Sincronização (Firebase) ============================ */
+const FIREBASE_CONFIG = { apiKey:"AIzaSyCjev617fzs4x4m6ixKMKPeGZTcpXXZRBc", authDomain:"pokedex-collector-60676.firebaseapp.com", projectId:"pokedex-collector-60676", storageBucket:"pokedex-collector-60676.firebasestorage.app", messagingSenderId:"217057738428", appId:"1:217057738428:web:36dc02f23f4a2959289ab9" };
+let _fbReady=null;
+function loadFirebase(){
+  if(window.firebase && firebase.apps) return Promise.resolve();
+  if(_fbReady) return _fbReady;
+  const load=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('cdn')); document.head.appendChild(s); });
+  const B='https://www.gstatic.com/firebasejs/10.12.2/';
+  _fbReady=(async()=>{ await load(B+'firebase-app-compat.js'); await Promise.all([load(B+'firebase-auth-compat.js'), load(B+'firebase-firestore-compat.js')]);
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); })();
+  return _fbReady;
+}
+function setSynced(ts){ _syncedAt=ts; LS.set('pdc.syncedAt', ts); }
+function syncStatus(txt){ const el=document.getElementById('acctStatus'); if(el) el.textContent=txt; }
+function fbPush(){ if(!_fbUser) return; clearTimeout(_syncT); _syncT=setTimeout(fbPushNow, 1500); syncStatus('a guardar…'); }
+async function fbPushNow(){ if(!_fbUser) return; const ts=Date.now();
+  try{ await firebase.firestore().collection('users').doc(_fbUser.uid).set({owned:JSON.stringify(owned), collection:JSON.stringify(collection), updatedAt:ts});
+    setSynced(ts); syncStatus('sincronizado ✓'); }catch(e){ syncStatus('erro a sincronizar'); } }
+async function fbPull(){ if(!_fbUser) return;
+  try{ const snap=await firebase.firestore().collection('users').doc(_fbUser.uid).get();
+    if(snap.exists){ const d=snap.data(); const cloudTs=d.updatedAt||0;
+      if(cloudTs > _syncedAt){ _adopting=true;
+        try{ owned=JSON.parse(d.owned||'{}'); }catch(e){} try{ collection=JSON.parse(d.collection||'{}'); }catch(e){}
+        saveOwned(); saveCollection(); rebuildOwnedIndex(); _adopting=false; setSynced(cloudTs);
+        refreshAfterSync(); syncStatus('sincronizado ✓'); return;
+      } }
+    fbPushNow();   // nuvem vazia/antiga → envia o local
+  }catch(e){ syncStatus('erro a sincronizar'); }
+}
+function refreshAfterSync(){ renderProgress();
+  const h=location.hash.replace('#','');
+  if(!document.getElementById('homeView').hidden) renderGrid();
+  else if(h==='wallet') renderWallet(); else if(h==='sets') renderSets();
+}
+let _fbInited=false;
+function fbInit(){
+  if(_fbInited) return; _fbInited=true;
+  loadFirebase().then(()=>{
+    firebase.auth().onAuthStateChanged(u=>{ _fbUser=u; if(u) LS.set('pdc.hasAccount',true);
+      syncStatus(u?('ligado como '+u.email):''); if(u) fbPull(); updateAcctSheet(); });
+  }).catch(()=>{});
+}
+async function fbAuth(email, pw, create){ await loadFirebase();
+  return create ? firebase.auth().createUserWithEmailAndPassword(email, pw) : firebase.auth().signInWithEmailAndPassword(email, pw); }
+async function fbSignOut(){ try{ await loadFirebase(); await firebase.auth().signOut(); }catch(e){} _fbUser=null; }
+function acctHTML(){
+  if(_fbUser) return `<div class="setrow"><div class="lab"><b>Sincronização</b><span id="acctStatus">ligado como ${_fbUser.email}</span></div><button class="btn sm" id="acctOut">Sair</button></div>`;
+  return `<div style="padding:4px 2px"><div class="lab" style="margin-bottom:8px"><b>Sincronizar com email</b><span>entra para teres a coleção em qualquer telemóvel</span></div>
+    <input id="acctEmail" type="email" placeholder="email" autocomplete="username" style="width:100%;margin-bottom:8px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)">
+    <input id="acctPw" type="password" placeholder="palavra-passe (mín. 6)" autocomplete="current-password" style="width:100%;margin-bottom:10px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)">
+    <div style="display:flex;gap:8px"><button class="btn" id="acctSignin" style="flex:1;justify-content:center">Entrar</button><button class="btn gold" id="acctCreate" style="flex:1;justify-content:center">Criar conta</button></div>
+    <div id="acctStatus" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center"></div></div>`;
+}
+function wireAcct(){
+  const out=document.getElementById('acctOut'); if(out) out.onclick=async()=>{ await fbSignOut(); updateAcctSheet(); toast('Saíste'); };
+  const si=document.getElementById('acctSignin'), cr=document.getElementById('acctCreate');
+  const go=async create=>{ const email=(document.getElementById('acctEmail').value||'').trim(), pw=(document.getElementById('acctPw').value||'');
+    if(!email||pw.length<6){ syncStatus('mete email e palavra-passe (mín. 6 letras)'); return; }
+    syncStatus('a entrar…'); fbInit(); try{ await fbAuth(email, pw, create); LS.set('pdc.hasAccount',true); toast('Ligado ✔'); updateAcctSheet(); }
+    catch(e){ syncStatus(fbErr(e)); } };
+  if(si) si.onclick=()=>go(false); if(cr) cr.onclick=()=>go(true);
+}
+function fbErr(e){ const c=(e&&e.code)||''; if(c.includes('email-already-in-use')) return 'esse email já tem conta — usa Entrar'; if(c.includes('wrong-password')||c.includes('invalid-credential')) return 'palavra-passe errada'; if(c.includes('user-not-found')) return 'conta não existe — usa Criar conta'; if(c.includes('invalid-email')) return 'email inválido'; if(c.includes('weak-password')) return 'palavra-passe fraca (mín. 6)'; return (e&&e.message)||'erro'; }
+function updateAcctSheet(){ const box=document.getElementById('acctBox'); if(box){ box.innerHTML=acctHTML(); wireAcct(); } }
+
 /* ============================ router ============================ */
 function route(){
   const h=location.hash.replace('#','');
@@ -1555,6 +1625,7 @@ async function boot(){
       document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ try{ reg.update(); }catch(e){} } });
     }).catch(()=>{});
   }
+  if(LS.get('pdc.hasAccount')) fbInit();   // se já usaste sync, liga automaticamente
 }
 boot();
 </script>
