@@ -440,7 +440,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v29 · 03/10';
+const APP_VER = 'v30 · 03/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -516,6 +516,44 @@ function syncRepsForMon(mon){   // representativo da grelha = melhor carta que t
       collection[sid]={cardId:best.id,name:best.name,setName:best.setName,image:best.image,rarity:best.rarity,no:best.no,price:u?{value:u.value,cur:u.cur||'EUR'}:null,addedAt:(prev&&prev.addedAt)||Date.now()}; ch=true;
     } else if(collection[sid] && collection[sid].cardId!==null){ delete collection[sid]; ch=true; } });   // mantém "sem carta"
   if(ch) saveCollection();
+}
+/* ---- auto-correção de dados antigos ----
+   Versões antigas podiam guardar o representativo (ou o dexId de uma carta) no Pokémon errado
+   — ex. uma carta do Swellow (#277) acabava no slot do Chingling (#433). Isto repara automaticamente:
+   (1) confirma o dexId verdadeiro de cada carta na TCGdex (uma vez, fica em cache com dexOk)
+   (2) reconstrói TODOS os representativos da grelha a partir do owned (fonte da verdade). */
+async function healDexIds(){
+  const need=[]; for(const k in owned){ if(!owned[k].dexOk) need.push(k); }
+  if(!need.length) return false;
+  let changed=false;
+  await pool(need, async k=>{ const c=owned[k]; if(!c) return;
+    const full=await fetchCardFull(c.id);
+    if(full){ if(Array.isArray(full.dexId) && full.dexId.length){ const nd=full.dexId.map(Number);
+        if(JSON.stringify(nd)!==JSON.stringify((c.dexId||[]).map(Number))){ c.dexId=nd; changed=true; } }
+      c.dexOk=true; }
+  }, 6);
+  saveOwned(); if(changed) rebuildOwnedIndex();
+  return changed;
+}
+function repSig(o){ return Object.keys(o).sort().map(sid=>{ const r=o[sid]||{}; return sid+':'+(r.cardId||'')+':'+((r.price&&r.price.value)||''); }).join(','); }
+function rebuildAllReps(){   // representativo = melhor carta que tens de cada slot/forma; mantém "sem carta"
+  const flags={}; for(const sid in collection){ const r=collection[sid]; if(r && r.cardId==null) flags[sid]=r; }
+  const best={};
+  for(const k in owned){ const c=owned[k]; const u=cardUnitValue(c); const val=u?u.value:0;
+    (c.dexId||[]).forEach(n=>{ const sid=slotId(n, detectForm(c.name)); if(!best[sid] || val>best[sid].val) best[sid]={c,val}; }); }
+  const nc={};
+  for(const sid in best){ const c=best[sid].c, u=cardUnitValue(c);
+    nc[sid]={cardId:c.id,name:c.name,setName:c.setName,image:c.image,rarity:c.rarity,no:c.no,price:u?{value:u.value,cur:u.cur||'EUR'}:null,addedAt:(collection[sid]&&collection[sid].addedAt)||Date.now()}; }
+  for(const sid in flags){ if(!nc[sid]) nc[sid]=flags[sid]; }   // só "sem carta" onde não há carta real
+  const changed = repSig(nc)!==repSig(collection);
+  collection=nc; if(changed) saveCollection();
+  return changed;
+}
+async function healData(){
+  const dex = await healDexIds().catch(()=>false);
+  const reps = rebuildAllReps();
+  if(dex||reps){ renderProgress(); if(!document.getElementById('homeView').hidden) renderGrid(); }
+  return dex||reps;
 }
 function cardLots(id){ return Object.values(owned).filter(o=>o.id===id); }
 function ownedHasCard(id){ return Object.values(owned).some(o=>o.id===id); }
@@ -1186,7 +1224,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   wireAcct();
 };
 function exportBackup(){
-  const data = JSON.stringify({app:'pokedex-collector', v:1, exported:new Date().toISOString(), collection}, null, 2);
+  const data = JSON.stringify({app:'pokedex-collector', v:2, exported:new Date().toISOString(), owned, collection}, null, 2);
   const blob = new Blob([data], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href=url; a.download=`pokedex-colecao-${new Date().toISOString().slice(0,10)}.json`;
@@ -1196,7 +1234,10 @@ function exportBackup(){
 function importBackup(file, close){
   if(!file) return; const r=new FileReader();
   r.onload=()=>{ try{ const j=JSON.parse(r.result); const c=j.collection||j; if(typeof c!=='object') throw 0;
-    const n=Object.keys(c).length; collection=c; saveCollection(); renderGrid();
+    if(j.owned && typeof j.owned==='object'){ owned=j.owned; saveOwned(); rebuildOwnedIndex(); }
+    const n=Object.keys(c).length; collection=c; saveCollection();
+    if(j.owned) rebuildAllReps();   // garante coerência owned↔representativos
+    renderGrid();
     if(close) close(); toast(`Importado ✔ ${n} registos`);
   }catch(e){ toast('Ficheiro inválido'); } };
   r.readAsText(file);
@@ -1579,7 +1620,7 @@ async function fbPull(){ if(!_fbUser) return;
       if(cloudTs > _syncedAt){ _adopting=true;
         try{ owned=JSON.parse(d.owned||'{}'); }catch(e){} try{ collection=JSON.parse(d.collection||'{}'); }catch(e){}
         saveOwned(); saveCollection(); rebuildOwnedIndex(); _adopting=false; setSynced(cloudTs);
-        refreshAfterSync(); syncStatus('sincronizado ✓'); return;
+        refreshAfterSync(); syncStatus('sincronizado ✓'); healData().catch(()=>{}); return;
       } }
     fbPushNow();   // nuvem vazia/antiga → envia o local
   }catch(e){ syncStatus('erro a sincronizar'); }
@@ -1657,6 +1698,8 @@ async function boot(){
     if(location.hash.replace('#','')===target) route(); else location.hash=target; });
   renderGrid();
   route();
+  // reparar dados antigos mal-atribuídos (ex. carta no Pokémon errado) + alinhar representativos
+  if(Object.keys(owned).length) healData().catch(()=>{});
   // atualizar preços da coleção em 2º plano ao abrir a app (só busca os que estão desatualizados)
   if(Object.keys(owned).length){
     refreshOwnedPrices().then(n=>{ if(n>0){
