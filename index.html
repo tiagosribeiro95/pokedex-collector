@@ -440,7 +440,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v30 · 03/10';
+const APP_VER = 'v31 · 03/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -528,9 +528,11 @@ async function healDexIds(){
   let changed=false;
   await pool(need, async k=>{ const c=owned[k]; if(!c) return;
     const full=await fetchCardFull(c.id);
-    if(full){ if(Array.isArray(full.dexId) && full.dexId.length){ const nd=full.dexId.map(Number);
-        if(JSON.stringify(nd)!==JSON.stringify((c.dexId||[]).map(Number))){ c.dexId=nd; changed=true; } }
-      c.dexOk=true; }
+    if(full && Array.isArray(full.dexId) && full.dexId.length){   // só confiamos quando a API dá um dexId real
+      const nd=full.dexId.map(Number);
+      if(JSON.stringify(nd)!==JSON.stringify((c.dexId||[]).map(Number))){ c.dexId=nd; changed=true; }
+      c.dexOk=true;   // verificado — não volta a procurar
+    }   // API sem dexId (ex. alguns sets JP) → não congela um valor possivelmente errado; corrige-se ao re-adicionar
   }, 6);
   saveOwned(); if(changed) rebuildOwnedIndex();
   return changed;
@@ -915,7 +917,7 @@ function paintForm(mon){
   // wire "mine" actions
   const addMore = body.querySelector('#addMore'); if(addMore) addMore.onclick=()=>{ document.getElementById('cgrid').scrollIntoView({behavior:'smooth'}); };
   body.querySelectorAll('.minecard').forEach(b=> b.onclick=()=>{ const l=owned[b.dataset.lot]; if(!l) return;
-    openCardEditor({id:l.id,name:l.name,image:l.image,localId:(l.no||'').split('/')[0]||null,set:{name:l.setName},rarity:l.rarity,dexId:(l.dexId&&l.dexId.length?l.dexId:[mon.n]),lang:l.lang}, ()=>afterOwnChange(mon)); });
+    openCardEditor({id:l.id,name:l.name,image:l.image,localId:(l.no||'').split('/')[0]||null,set:{name:l.setName},rarity:l.rarity,dexId:[mon.n],lang:l.lang}, ()=>afterOwnChange(mon)); });
   const rem = body.querySelector('#removeOwn'); if(rem) rem.onclick=()=>{ if(collection[sid]&&collection[sid].cardId) removeOwnedCard(collection[sid].cardId); delete collection[sid]; saveCollection(); toast('Removido'); afterOwnChange(mon); };
   const pb = body.querySelector('#pickBelow'); if(pb) pb.onclick=()=>document.getElementById('cgrid').scrollIntoView({behavior:'smooth'});
   const mnc = body.querySelector('#markNoCard'); if(mnc) mnc.onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); toast('Marcado ✔'); pickIntent=false; afterOwnChange(mon); };
@@ -1546,14 +1548,17 @@ async function openCardEditor(card, onDone, opts){
   if(full){ prices=extractPrices(full.pricing); if(full.variants) populate(full.variants); updMkt(); }
   saveBtn.onclick=()=>{
     const grade=gradeSel.value, variant=varSel.value, lang=langSel.value; const vv=(vEl.value||'').trim().replace(',','.'); const value=vv?parseFloat(vv):null;
-    const data={ id:card.id, name:card.name, image:card.image, localId:card.localId, set:card.set, rarity:(full&&full.rarity)||card.rarity, dexId:(full&&full.dexId)||card.dexId||[], lang, variants:(full&&full.variants)||card.variants };
+    // dexId: quando se adiciona a partir da página de um Pokémon, o chamador passa o dexId certo ([mon.n]) —
+    // esse manda. Só se recorre ao full.dexId (ex. a partir das Coleções) quando o chamador não indica nenhum.
+    const dexId = (card.dexId&&card.dexId.length) ? card.dexId : ((full&&full.dexId&&full.dexId.length) ? full.dexId : []);
+    const data={ id:card.id, name:card.name, image:card.image, localId:card.localId, set:card.set, rarity:(full&&full.rarity)||card.rarity, dexId, lang, variants:(full&&full.variants)||card.variants };
     const rec=addOwnedCard(data,{qty,grade,value,variant,lang});
     if(rec && (prices.base||prices.foil)){ rec.mkt=prices; rec.mktTs=Date.now(); saveOwned(); }
     if(data.dexId&&data.dexId.length){ const sid=slotId(data.dexId[0],detectForm(card.name)); if((opts&&opts.setAsRep)||!collection[sid]){ const rp=priceForVariant(prices,variant); collection[sid]={cardId:card.id,name:card.name,setName:(card.set&&card.set.name)||'',image:card.image,rarity:data.rarity,no:(card.localId||''),price:rp&&rp.value!=null?{value:rp.value,cur:rp.cur}:null,addedAt:Date.now()}; saveCollection(); } }
     close(); toast('Guardado ✔'); onDone&&onDone();
   };
   rmBtn.onclick=()=>{ removeLot(lotKey(card.id,varSel.value,gradeSel.value,langSel.value));
-    const dx=(full&&full.dexId)||card.dexId; if(dx&&dx.length && !ownedHasCard(card.id)){ const sid=slotId(dx[0],detectForm(card.name)); if(collection[sid]&&collection[sid].cardId===card.id){ delete collection[sid]; saveCollection(); } }
+    const dx=(card.dexId&&card.dexId.length)?card.dexId:((full&&full.dexId)||[]); if(dx&&dx.length && !ownedHasCard(card.id)){ const sid=slotId(dx[0],detectForm(card.name)); if(collection[sid]&&collection[sid].cardId===card.id){ delete collection[sid]; saveCollection(); } }
     close(); toast('Removido'); onDone&&onDone(); };
 }
 
