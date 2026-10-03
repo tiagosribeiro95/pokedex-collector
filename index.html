@@ -138,6 +138,24 @@ h1,h2,h3{font-family:Sora,sans-serif; margin:0; text-wrap:balance}
 .mine .meta .set{font-size:13px;color:var(--muted)}
 .mine .price{font-family:Sora;font-weight:700;font-size:19px;margin-top:6px}
 .mine .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+/* galeria "As tuas cartas" (várias cartas por Pokémon) */
+.minewrap{margin-top:6px}
+.minehead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.minehead .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:700}
+.minehead .minemeta{font-family:Sora;font-weight:700;font-size:15px;margin-top:2px}
+.minegal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.minecard{display:flex;gap:11px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:9px;box-shadow:var(--shadow);width:100%;position:relative}
+.minecard .mc-img{width:52px;flex:0 0 auto;aspect-ratio:734/1024;border-radius:7px;overflow:hidden;background:var(--surface-2);position:relative;box-shadow:0 3px 9px rgba(0,0,0,.16)}
+.minecard .mc-img img{width:100%;height:100%;object-fit:cover}
+.minecard .mc-q{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.72);color:#fff;font-size:10px;font-weight:700;border-radius:6px;padding:1px 4px}
+.minecard .mc-body{flex:1;min-width:0}
+.minecard .mc-nm{font-weight:700;font-size:13px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.minecard .mc-sub{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.minecard .mc-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.minecard .mc-badges span{font-size:9.5px;font-weight:700;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 5px;color:var(--muted)}
+.minecard .mc-v{font-family:Sora;font-weight:700;font-size:14px;margin-top:4px}
+.minecard .mc-v small{font-weight:600;color:var(--muted);font-size:10px}
+.minecard .mc-edit{position:absolute;top:8px;right:9px;font-size:10px;color:var(--faint);font-weight:700}
 .btn{padding:9px 14px;border-radius:11px;font-weight:600;font-size:13px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
 .btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .btn.gold{background:var(--accent);color:#231a04;border-color:var(--accent)}
@@ -422,7 +440,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v28 · 01/10';
+const APP_VER = 'v29 · 03/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -486,6 +504,19 @@ function rebuildOwnedIndex(){ ownedByDex={}; for(const k in owned){ (owned[k].de
 rebuildOwnedIndex();
 function ownedMatchesSlot(n, form){ const ks=ownedByDex[n]; if(!ks) return null; form=form||'base';
   for(const k of ks){ if(owned[k] && detectForm(owned[k].name)===form) return owned[k]; } return null; }
+function ownedLotsForSlot(n, form){ const r=[]; const ks=ownedByDex[n]||[]; form=form||'base';
+  for(const k of ks){ const c=owned[k]; if(c && detectForm(c.name)===form) r.push(c); }
+  return r.sort((a,b)=> (cardTotalValue(b)) - (cardTotalValue(a))); }
+function syncRepsForMon(mon){   // representativo da grelha = melhor carta que tens de cada forma (podes ter várias)
+  let ch=false;
+  FORM_ORDER.forEach(f=>{ const sid=slotId(mon.n,f); const lots=ownedLotsForSlot(mon.n,f);
+    if(lots.length){ let best=lots[0], bv=(cardUnitValue(lots[0])||{}).value||0;
+      for(const l of lots){ const v=(cardUnitValue(l)||{}).value||0; if(v>bv){bv=v;best=l;} }
+      const u=cardUnitValue(best), prev=collection[sid];
+      collection[sid]={cardId:best.id,name:best.name,setName:best.setName,image:best.image,rarity:best.rarity,no:best.no,price:u?{value:u.value,cur:u.cur||'EUR'}:null,addedAt:(prev&&prev.addedAt)||Date.now()}; ch=true;
+    } else if(collection[sid] && collection[sid].cardId!==null){ delete collection[sid]; ch=true; } });   // mantém "sem carta"
+  if(ch) saveCollection();
+}
 function cardLots(id){ return Object.values(owned).filter(o=>o.id===id); }
 function ownedHasCard(id){ return Object.values(owned).some(o=>o.id===id); }
 function defaultVariant(card){ const v=card&&card.variants; if(!v) return 'normal'; if(v.normal) return 'normal'; if(v.holo) return 'holo'; if(v.reverse) return 'reverse'; if(v.firstEdition) return 'firstEdition'; return 'normal'; }
@@ -805,17 +836,18 @@ function paintForm(mon){
   const own = collection[sid];
   const formName = curForm==='base' ? mon.name : `${FORM_LABEL[curForm]==='Mega'?'Mega ':''}${mon.name}${REGION_LABEL[curForm]?' ('+REGION_LABEL[curForm]+')':''}`;
 
-  // "A minha carta"
+  // "As tuas cartas" — todas as que tens deste Pokémon nesta forma (podem vir de coleções diferentes)
+  const myLots = ownedLotsForSlot(mon.n, curForm);
   let mine;
-  if(own && own.cardId){
-    mine = `<div class="mine">
-      <div class="cardimg"><img loading="lazy" src="${cardImg(own.image,'high')||PLACEHOLDER}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
-      <div class="meta"><div class="k">A minha carta</div><h3>${own.name||formName}</h3>
-        <div class="set">${own.setName||''}${own.no?' · <span class="tnum">'+own.no+'</span>':''}</div>
-        <div class="price">${own.price?fmtPrice(own.price):'—'}</div>
-        <div class="acts"><button class="btn sm" id="changeCard">Trocar carta</button><button class="btn sm danger" id="removeOwn">Remover</button></div>
-      </div></div>`;
-  } else if(own){
+  if(myLots.length){
+    const tot = myLots.reduce((s,l)=> s+cardTotalValue(l), 0);
+    const n = myLots.reduce((s,l)=> s+(l.qty||1), 0);
+    mine = `<div class="minewrap"><div class="minehead">
+        <div><div class="k">As tuas cartas</div><div class="minemeta"><b>${n}</b> carta${n!==1?'s':''} · ${fmtEur(tot)}</div></div>
+        <button class="btn sm" id="addMore">＋ Adicionar outra</button></div>
+      <div class="minegal">${myLots.map(l=>mineCardHTML(l)).join('')}</div>
+      <div id="mineHint"></div></div>`;
+  } else if(own && !own.cardId){
     mine = `<div class="mine none"><div class="k" style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);font-weight:700">${formName}</div>
       <p style="margin:8px 0 12px">Marcaste como <b>tido</b>, mas ainda não escolheste a carta.</p>
       <button class="btn gold" id="pickBelow">Escolher a minha carta</button>
@@ -843,7 +875,9 @@ function paintForm(mon){
     <div class="cgrid" id="cgrid"></div>`;
 
   // wire "mine" actions
-  const changeBtn = body.querySelector('#changeCard'); if(changeBtn) changeBtn.onclick=()=>{ document.getElementById('cgrid').scrollIntoView({behavior:'smooth'}); };
+  const addMore = body.querySelector('#addMore'); if(addMore) addMore.onclick=()=>{ document.getElementById('cgrid').scrollIntoView({behavior:'smooth'}); };
+  body.querySelectorAll('.minecard').forEach(b=> b.onclick=()=>{ const l=owned[b.dataset.lot]; if(!l) return;
+    openCardEditor({id:l.id,name:l.name,image:l.image,localId:(l.no||'').split('/')[0]||null,set:{name:l.setName},rarity:l.rarity,dexId:(l.dexId&&l.dexId.length?l.dexId:[mon.n]),lang:l.lang}, ()=>afterOwnChange(mon)); });
   const rem = body.querySelector('#removeOwn'); if(rem) rem.onclick=()=>{ if(collection[sid]&&collection[sid].cardId) removeOwnedCard(collection[sid].cardId); delete collection[sid]; saveCollection(); toast('Removido'); afterOwnChange(mon); };
   const pb = body.querySelector('#pickBelow'); if(pb) pb.onclick=()=>document.getElementById('cgrid').scrollIntoView({behavior:'smooth'});
   const mnc = body.querySelector('#markNoCard'); if(mnc) mnc.onclick=()=>{ collection[sid]={cardId:null,addedAt:Date.now()}; saveCollection(); toast('Marcado ✔'); pickIntent=false; afterOwnChange(mon); };
@@ -876,6 +910,22 @@ function bestValue(cards){
   return best;
 }
 const cardNo = c => c.localId ? (c.localId + (c.set.cardCount&&c.set.cardCount.official?('/'+c.set.cardCount.official):'')) : '';
+function mineCardHTML(l){
+  const u = cardUnitValue(l);
+  const key = lotKey(l.id, l.variant, l.grade, l.lang);
+  const badges=[];
+  if(l.variant && l.variant!=='normal') badges.push(VARIANT_LABEL[l.variant]||l.variant);
+  if(l.lang && l.lang!=='en') badges.push((LANG_NAME[l.lang]||l.lang));
+  if(l.grade && l.grade!=='raw') badges.push(l.grade);
+  return `<button class="minecard" data-lot="${key}">
+    <div class="mc-img"><img loading="lazy" src="${l.image?cardImg(l.image,'low'):PLACEHOLDER}" alt="" onerror="this.src='${PLACEHOLDER}'">${(l.qty||1)>1?`<span class="mc-q">×${l.qty}</span>`:''}</div>
+    <div class="mc-body"><div class="mc-nm">${l.name}</div>
+      <div class="mc-sub">${l.setName||''}${l.no?' · <span class="tnum">'+l.no+'</span>':''}</div>
+      ${badges.length?`<div class="mc-badges">${badges.map(b=>`<span>${b}</span>`).join('')}</div>`:''}
+      <div class="mc-v">${u?fmtPrice({value:u.value,cur:u.cur}):'—'}${(l.qty||1)>1?` <small>× ${l.qty}</small>`:''}</div></div>
+    <span class="mc-edit">editar ›</span>
+  </button>`;
+}
 function cardHTML(c, ownedIds, topId){
   const p = priceMap[c.id];
   const art = isArtRarity(c.rarity);
@@ -902,7 +952,7 @@ function cardHTML(c, ownedIds, topId){
   </div>`;
 }
 function allCardsOf(){ let a=[]; for(const f in curCards) a=a.concat(curCards[f]); return a; }
-function ownedIdSet(){ const s=new Set(); for(const k in collection){ const o=collection[k]; if(o&&o.cardId) s.add(o.cardId); } return s; }
+function ownedIdSet(){ const s=new Set(); for(const k in owned) s.add(owned[k].id); return s; }
 function cardMatches(c, qraw){
   const q=(qraw||'').toLowerCase().replace(/\s+/g,'');
   if(!q) return true;
@@ -970,7 +1020,7 @@ async function ensurePrices(mon, sid, cards){
   }
   if(note) note.textContent='';
   if(sortMode==='value') reorderByValue(sid, cards);   // reorder DOM in place, no re-fetch
-  showUpgradeHint(sid, cards);
+  showUpgradeHint(mon, cards);
 }
 function reorderByValue(sid, cards){
   const grid = document.getElementById('cgrid'); if(!grid) return;
@@ -982,32 +1032,25 @@ function reorderByValue(sid, cards){
   const best = bestValue(sorted);
   if(best){ const n = grid.querySelector('.ccard[data-id="'+CSS.escape(best.id)+'"]'); if(n){ const tb = n.querySelector('.topbadges'); if(tb) tb.insertAdjacentHTML('beforeend','<span class="ribbon top">💎 TOP €</span>'); } }
 }
-function showUpgradeHint(sid, cards){
-  const own = collection[sid];
-  if(document.getElementById('upHint')) return;
-  if(own && own.cardId && own.price && own.price.value!=null){
-    const best = bestValue(cards);
-    if(best && best.id!==own.cardId && best.value > own.price.value*1.15){
-      const acts = document.querySelector('#formBody .mine .meta .acts');
-      if(acts){
-        const d=document.createElement('div'); d.id='upHint'; d.className='upgrade-hint'; d.style.padding='8px 0 0';
-        d.innerHTML = `⬆ Podias valorizar: <b>${best.name}</b> (${best.set}) vale ${(best.cur==='USD'?'$':'€')+best.value.toFixed(2)}.`;
-        acts.after(d);
-      }
-    }
+function showUpgradeHint(mon, cards){
+  const host = document.getElementById('mineHint'); if(!host || host.querySelector('#upHint')) return;
+  const lots = ownedLotsForSlot(mon.n, curForm); if(!lots.length) return;
+  let ownBest=0, ownIds=new Set();
+  for(const l of lots){ const u=cardUnitValue(l); if(u&&u.value>ownBest) ownBest=u.value; ownIds.add(l.id); }
+  if(ownBest<=0) return;
+  const best = bestValue(cards);
+  if(best && !ownIds.has(best.id) && best.value > ownBest*1.15){
+    host.innerHTML = `<div id="upHint" class="upgrade-hint">⬆ Podias valorizar: <b>${best.name}</b> (${best.set}) vale ${(best.cur==='USD'?'$':'€')+best.value.toFixed(2)}.</div>`;
   }
 }
 function choose(mon, card){
   if(!card) return;
-  const f = detectForm(card.name);
-  const sid = slotId(mon.n, f);
-  const repaint=()=>{ pickIntent=false; cardQuery=''; curForm=f; paintDetail(mon, FORM_ORDER.filter(x=>curCards[x]&&curCards[x].length)); renderProgress(); };
-  if(collection[sid] && collection[sid].cardId===card.id){   // já é a minha → remove (toggle)
-    removeOwnedCard(card.id); delete collection[sid]; saveCollection(); repaint(); toast('Removida'); return;
-  }
-  openCardEditor({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:[mon.n],lang:card.lang,variants:card.variants}, ()=>{ location.hash=''; }, {setAsRep:true});
+  // abre o editor (quantidade / variante / idioma / avaliação / valor). Fica no Pokémon para poderes
+  // adicionar várias cartas (formas diferentes, ou a mesma de outra coleção).
+  openCardEditor({id:card.id,name:card.name,image:card.image,localId:card.localId,set:card.set,rarity:card.rarity,dexId:[mon.n],lang:card.lang,variants:card.variants}, ()=>{ curForm=detectForm(card.name); afterOwnChange(mon); }, {setAsRep:true});
 }
 function afterOwnChange(mon){
+  syncRepsForMon(mon);   // mantém os representativos da grelha coerentes com o que tens
   // recompute forms present and repaint detail (keeps cache)
   const formsPresent = FORM_ORDER.filter(f=>curCards[f] && curCards[f].length);
   paintDetail(mon, formsPresent);
