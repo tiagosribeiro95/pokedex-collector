@@ -440,7 +440,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v31 · 03/10';
+const APP_VER = 'v32 · 03/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -1120,12 +1120,12 @@ document.getElementById('grid').addEventListener('click', e=>{
 /* ============================ filters / search ============================ */
 document.getElementById('filterChips').addEventListener('click', e=>{ const b=e.target.closest('[data-filter]'); if(!b)return;
   settings.filter=b.dataset.filter; saveSettings();
-  document.querySelectorAll('#filterChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); });
+  document.querySelectorAll('#filterChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); window.scrollTo(0,0); });
 document.getElementById('genChips').addEventListener('click', e=>{ const b=e.target.closest('[data-gen]'); if(!b)return;
   settings.gen=b.dataset.gen; saveSettings();
-  document.querySelectorAll('#genChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); });
+  document.querySelectorAll('#genChips .chip').forEach(c=>c.classList.toggle('on', c===b)); renderGrid(); window.scrollTo(0,0); });
 let searchDeb=null;
-document.getElementById('search').addEventListener('input', e=>{ clearTimeout(searchDeb); searchDeb=setTimeout(()=>{ searchTerm=e.target.value.trim(); renderGrid(); }, 160); });
+document.getElementById('search').addEventListener('input', e=>{ clearTimeout(searchDeb); searchDeb=setTimeout(()=>{ searchTerm=e.target.value.trim(); renderGrid(); window.scrollTo(0,0); }, 160); });
 
 /* ============================ menu / settings sheet ============================ */
 function openSheet(html){
