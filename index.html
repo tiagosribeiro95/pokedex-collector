@@ -360,16 +360,15 @@ main{padding-bottom:68px}
 .wt-v{font-family:Sora;font-weight:700;font-size:14px;text-align:right;min-width:66px}
 .wt-v small{display:block;font-family:Inter;font-weight:500;font-size:10px;color:var(--faint)}
 .wnote{font-size:11px;color:var(--faint);margin:16px 0 0;line-height:1.5}
-/* localizador de valorizações */
-.upglist{display:flex;flex-direction:column;gap:7px}
-.upgrow{display:flex;align-items:center;gap:11px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);width:100%;text-align:left}
-.upgrow .ur-img{width:40px;height:56px;flex:0 0 auto;border-radius:6px;overflow:hidden;background:var(--surface-2)}
-.upgrow .ur-img img{width:100%;height:100%;object-fit:cover}
-.upgrow .ur-m{flex:1;min-width:0}
-.upgrow .ur-m b{font-size:13.5px;font-weight:700}
-.upgrow .ur-m span{display:block;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.upgrow .ur-m .ur-set{font-size:10.5px;color:var(--faint)}
-.upgrow .ur-g{font-family:Sora;font-weight:700;font-size:14px;color:var(--good);text-align:right;min-width:58px;white-space:nowrap}
+/* tab Valorizar — grelha de Pokémon com cartas que valem mais */
+.upggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.upgtile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px;box-shadow:var(--shadow);text-align:center}
+.upgtile .ut-badge{position:absolute;top:7px;right:7px;z-index:2;background:var(--good);color:#fff;font-family:Sora;font-weight:700;font-size:11px;border-radius:8px;padding:2px 6px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.upgtile .ut-img{aspect-ratio:734/1024;border-radius:9px;overflow:hidden;background:var(--surface-2);margin-bottom:7px}
+.upgtile .ut-img img{width:100%;height:100%;object-fit:cover}
+.upgtile .ut-nm{font-weight:700;font-size:13px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upgtile .ut-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.upgtile .ut-sub b{color:var(--ink)}
 .chips.setfilter{margin:0 0 12px}
 .ed-card{display:flex;gap:12px;align-items:center;margin-bottom:6px}
 .ed-img{width:58px;flex:0 0 auto;aspect-ratio:734/1024;border-radius:8px;overflow:hidden;background:var(--surface-2)}
@@ -432,6 +431,7 @@ main{padding-bottom:68px}
   <div id="homeView" class="wrap"><div class="grid" id="grid"></div><div id="gridEmpty" class="empty" hidden></div></div>
   <div id="setsView" class="wrap" hidden></div>
   <div id="walletView" class="wrap" hidden></div>
+  <div id="upgView" class="wrap" hidden></div>
   <div id="detailView" class="detail" hidden></div>
 </main>
 
@@ -439,6 +439,7 @@ main{padding-bottom:68px}
   <button class="navbtn on" data-tab="dex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg><span>Pokédex</span></button>
   <button class="navbtn" data-tab="sets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="20"/></svg><span>Sets</span></button>
   <button class="navbtn" data-tab="wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h12a2 2 0 012 2v1"/><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2H6"/><circle cx="16.5" cy="13.5" r="1.2"/></svg><span>Carteira</span></button>
+  <button class="navbtn" data-tab="upg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg><span>Valorizar</span></button>
 </nav>
 
 <button class="fab" id="scanFab" aria-label="Digitalizar carta">
@@ -451,7 +452,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v33 · 04/10';
+const APP_VER = 'v34 · 04/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -816,17 +817,18 @@ function renderGrid(){
 /* ============================ detail ============================ */
 let curDex=null, curForm='base', curCards=null, sortMode=settings.sort, priceMap={}, priceToken=0, pickIntent=false, cardQuery='', imgToken=0;
 
-function showView(which){   // 'home'(dex) | 'sets' | 'wallet' | 'detail'
+function showView(which){   // 'home'(dex) | 'sets' | 'wallet' | 'upg' | 'detail'
   document.getElementById('homeView').hidden = which!=='home';
   document.getElementById('homeControls').hidden = which!=='home';
   document.getElementById('setsView').hidden = which!=='sets';
   document.getElementById('walletView').hidden = which!=='wallet';
+  document.getElementById('upgView').hidden = which!=='upg';
   document.getElementById('detailView').hidden = which!=='detail';
   document.getElementById('topbar').hidden = which==='detail';   // no detalhe, a barra ‹ voltar é o topo fixo
   const fab=document.getElementById('scanFab'); if(fab) fab.hidden = !(which==='home'||which==='sets');
   const nav=document.getElementById('botnav'); if(nav) nav.hidden = false;   // sempre visível (navegação garantida, também no detalhe)
   if(which!=='detail'){ const tab=which==='home'?'dex':which; document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); }
-  document.getElementById('brandtxt').textContent = which==='home'?'Pokédex Collector':which==='sets'?'Coleções':which==='wallet'?'Carteira':'';
+  document.getElementById('brandtxt').textContent = which==='home'?'Pokédex Collector':which==='sets'?'Coleções':which==='wallet'?'Carteira':which==='upg'?'Valorizar':'';
 }
 let _gridScroll=0;
 function restoreScroll(s, tries){ tries=tries||0; window.scrollTo(0,s); if(Math.abs(window.scrollY-s)>4 && tries<12) requestAnimationFrame(()=>restoreScroll(s, tries+1)); }
@@ -1614,8 +1616,6 @@ function paintWallet(){
   const pv=pokedexValue();
   body.innerHTML=`<div class="seclabel">Coleção Pokédex</div>
     <div class="wsetlist" style="margin-bottom:2px"><div class="wsetrow" style="background:var(--accent-soft)"><span class="wsr-n">📕 1 carta por Pokémon</span><span class="wsr-c tnum">${pv.count}</span><span class="wsr-v tnum">${fmtEur(pv.value)}</span></div></div>
-    <div class="seclabel">Valorizar a Pokédex 💎</div>
-    <div id="upgBox"></div>
     <div class="seclabel">Valor por coleção</div>
     <div class="wsetlist">${setsArr.slice(0,12).map(([sid,s])=>`<div class="wsetrow"><span class="wsr-n">${s.name}</span><span class="wsr-c tnum">${s.n}</span><span class="wsr-v tnum">${fmtEur(s.val)}</span></div>`).join('')}</div>
     <div class="seclabel">Cartas mais valiosas</div>
@@ -1623,7 +1623,6 @@ function paintWallet(){
       <div class="wt-m"><b>${c.name}</b><span>${c.setName||''} ${c.no?('· '+c.no):''}${c.variant&&c.variant!=='normal'?(' · '+VARIANT_LABEL[c.variant]):''}${c.grade&&c.grade!=='raw'?(' · '+c.grade):''}</span></div>
       <div class="wt-v tnum">${fmtEur(cardTotalValue(c))}${(c.qty||1)>1?('<small>'+c.qty+'×</small>'):(u&&u.manual?'<small>manual</small>':'')}</div></div>`; }).join('')}</div>
     <p class="wnote">Preços raw do Cardmarket (via TCGdex). Avaliadas usam o valor que meteste. Movimento = média 7/30 dias vs. agora.</p>`;
-  wireUpgrades();
 }
 
 /* ======== Localizador de valorizações: cartas que valem mais do que as que tens ======== */
@@ -1655,42 +1654,47 @@ async function findUpgrades(onProgress){
   _upgCache={ts:Date.now(), list:out}; idbSet('upgrades2', _upgCache);
   return out;
 }
-async function wireUpgrades(){
-  const box=document.getElementById('upgBox'); if(!box) return;
+async function renderUpgradesView(){
+  const el=document.getElementById('upgView'); if(!el) return;
+  if(!Object.keys(owned).length){ el.innerHTML=`<div class="vhead"><h1>Valorizar</h1></div><div class="empty"><b>Ainda sem cartas</b><br>Regista cartas na Pokédex e vê aqui quais poderias trocar por mais valiosas.</div>`; return; }
   if(!_upgCache){ _upgCache = await idbGet('upgrades2') || null; }
-  if(_upgRunning){ return; }
-  if(_upgCache && _upgCache.list){ paintUpgrades(_upgCache); return; }
-  box.innerHTML=`<button class="btn gold" id="upgRun" style="width:100%;justify-content:center">🔎 Procurar cartas que valorizam</button>
-    <p class="wnote">Compara a carta que tens em cada Pokémon com todas as que existem e mostra as que valem mais (pode demorar à 1ª vez).</p>`;
+  el.innerHTML=`<div class="vhead"><div class="row"><h1 style="flex:1">Valorizar</h1>${(_upgCache&&_upgCache.list)?'<button class="btn sm" id="upgRe">↻ Reanalisar</button>':''}</div>
+    <p class="vsub">Pokémon onde existe uma carta que vale mais do que a tua — tocar abre o Pokémon.</p></div>
+    <div id="upgMain"></div>`;
+  const re=document.getElementById('upgRe'); if(re) re.onclick=runUpgrades;
+  const m=document.getElementById('upgMain');
+  if(_upgRunning){ m.innerHTML=`<div class="wprog" id="upgProg">a analisar…</div>`; return; }
+  if(_upgCache && _upgCache.list){ paintUpgradesGrid(_upgCache); return; }
+  m.innerHTML=`<button class="btn gold" id="upgRun" style="width:100%;justify-content:center;margin-top:6px">🔎 Procurar valorizações</button>
+    <p class="wnote">Compara a carta que tens em cada Pokémon com todas as que existem. À 1ª vez pode demorar (vai buscar preços); fica guardado para a próxima.</p>`;
   const b=document.getElementById('upgRun'); if(b) b.onclick=runUpgrades;
 }
 async function runUpgrades(){
-  const box=document.getElementById('upgBox'); if(!box || _upgRunning) return;
+  const m=document.getElementById('upgMain'); if(!m || _upgRunning) return;
   _upgRunning=true;
-  box.innerHTML=`<div class="wprog" id="upgProg">a preparar…</div>`;
+  m.innerHTML=`<div class="wprog" id="upgProg">a preparar…</div>`;
   const pr=document.getElementById('upgProg');
   try{
     await findUpgrades((phase,d,t)=>{ if(pr) pr.textContent=`a analisar (${phase}) ${d}/${t}…`; });
-    paintUpgrades(_upgCache);
-  }catch(e){ if(pr) pr.textContent='Não consegui analisar (sem ligação?).'; }
-  _upgRunning=false;
+    _upgRunning=false; renderUpgradesView();
+  }catch(e){ _upgRunning=false; if(pr) pr.textContent='Não consegui analisar (sem ligação?).'; }
 }
-function paintUpgrades(cache){
-  const box=document.getElementById('upgBox'); if(!box) return;
+function paintUpgradesGrid(cache){
+  const m=document.getElementById('upgMain'); if(!m) return;
   const list=(cache&&cache.list)||[];
   const when=cache&&cache.ts?new Date(cache.ts).toLocaleDateString('pt-PT'):'';
-  if(!list.length){ box.innerHTML=`<div class="wnote">✅ Em cada Pokémon registado, já tens a carta mais valiosa que existe (ou sem dados de preço). <button class="btn sm" id="upgRun" style="margin-left:6px">Analisar de novo</button></div>`;
-    const b=document.getElementById('upgRun'); if(b) b.onclick=runUpgrades; return; }
-  const rows=list.slice(0,40).map(u=>`<button class="upgrow" data-n="${u.n}" data-form="${u.form}">
-    <div class="ur-img"><img loading="lazy" src="${u.bestImg?cardImg(u.bestImg,'low'):PLACEHOLDER}" onerror="this.src='${PLACEHOLDER}'"></div>
-    <div class="ur-m"><b>${u.mon}${u.form!=='base'?' · '+(FORM_LABEL[u.form]||u.form):''}</b>
-      <span>Tens ${fmtEur(u.myVal)} → <b>${u.bestName}</b> ${fmtEur(u.bestVal)}</span>
-      <span class="ur-set">${u.bestSet}${u.more?(' · +'+u.more+' opç'+(u.more>1?'ões':'ão')):''}</span></div>
-    <div class="ur-g">+${fmtEur(u.gain)}</div></button>`).join('');
-  box.innerHTML=`<div class="upglist">${rows}</div>
-    <div class="wnote">${list.length} Pokémon com cartas mais valiosas${list.length>40?' (mostro os 40 maiores)':''} · ${when} <button class="btn sm" id="upgRun" style="margin-left:6px">↻</button></div>`;
-  box.querySelectorAll('.upgrow').forEach(b=> b.onclick=()=>{ const n=b.dataset.n, f=b.dataset.form; location.hash='p'+n+(f&&f!=='base'?'-'+f:''); });
-  const rb=document.getElementById('upgRun'); if(rb) rb.onclick=runUpgrades;
+  if(!list.length){ m.innerHTML=`<div class="empty"><b>Tudo no topo 🎉</b><br>Em cada Pokémon registado já tens a carta mais valiosa que existe (ou sem dados de preço).</div>`; return; }
+  m.innerHTML=`<div class="upggrid">${list.map(upgTile).join('')}</div>
+    <p class="wnote">${list.length} Pokémon com cartas mais valiosas · analisado ${when}</p>`;
+  m.querySelectorAll('.upgtile').forEach(b=> b.onclick=()=>{ const n=b.dataset.n,f=b.dataset.form; location.hash='p'+n+(f&&f!=='base'?'-'+f:''); });
+}
+function upgTile(u){
+  return `<button class="upgtile" data-n="${u.n}" data-form="${u.form}">
+    <div class="ut-badge">+${fmtEur(u.gain)}</div>
+    <div class="ut-img"><img loading="lazy" decoding="async" src="${u.bestImg?cardImg(u.bestImg,'low'):PLACEHOLDER}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
+    <div class="ut-nm">${u.mon}${u.form!=='base'?' · '+(FORM_LABEL[u.form]||u.form):''}</div>
+    <div class="ut-sub">tens ${fmtEur(u.myVal)} → <b>${fmtEur(u.bestVal)}</b>${u.more?(' · +'+u.more):''}</div>
+  </button>`;
 }
 
 /* ============================ Sincronização (Firebase) ============================ */
@@ -1766,6 +1770,7 @@ function route(){
   else if(m=h.match(/^set-(.+)$/)){ renderSetDetail(decodeURIComponent(m[1])); }
   else if(h==='sets'){ curDex=null; showView('sets'); renderSets(); }
   else if(h==='wallet'){ curDex=null; showView('wallet'); renderWallet(); }
+  else if(h==='upgrades'){ curDex=null; showView('upg'); renderUpgradesView(); }
   else { showView('home'); curDex=null; renderGrid(); if(_gridScroll){ const s=_gridScroll; _gridScroll=0; restoreScroll(s); } }   // volta à lista na mesma posição (uma vez)
 }
 window.addEventListener('hashchange', route);
@@ -1791,7 +1796,7 @@ async function boot(){
   }
   document.getElementById('scanFab').onclick=openScan;
   document.getElementById('botnav').addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(!b) return;
-    const t=b.dataset.tab; const target = t==='dex'?'':(t==='sets'?'sets':'wallet');
+    const t=b.dataset.tab; const target = t==='dex'?'':(t==='sets'?'sets':(t==='upg'?'upgrades':'wallet'));
     if(location.hash.replace('#','')===target) route(); else location.hash=target; });
   renderGrid();
   route();
