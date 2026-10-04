@@ -360,6 +360,17 @@ main{padding-bottom:68px}
 .wt-v{font-family:Sora;font-weight:700;font-size:14px;text-align:right;min-width:66px}
 .wt-v small{display:block;font-family:Inter;font-weight:500;font-size:10px;color:var(--faint)}
 .wnote{font-size:11px;color:var(--faint);margin:16px 0 0;line-height:1.5}
+/* localizador de valorizações */
+.upglist{display:flex;flex-direction:column;gap:7px}
+.upgrow{display:flex;align-items:center;gap:11px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);width:100%;text-align:left}
+.upgrow .ur-img{width:40px;height:56px;flex:0 0 auto;border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.upgrow .ur-img img{width:100%;height:100%;object-fit:cover}
+.upgrow .ur-m{flex:1;min-width:0}
+.upgrow .ur-m b{font-size:13.5px;font-weight:700}
+.upgrow .ur-m span{display:block;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upgrow .ur-m .ur-set{font-size:10.5px;color:var(--faint)}
+.upgrow .ur-g{font-family:Sora;font-weight:700;font-size:14px;color:var(--good);text-align:right;min-width:58px;white-space:nowrap}
+.chips.setfilter{margin:0 0 12px}
 .ed-card{display:flex;gap:12px;align-items:center;margin-bottom:6px}
 .ed-img{width:58px;flex:0 0 auto;aspect-ratio:734/1024;border-radius:8px;overflow:hidden;background:var(--surface-2)}
 .ed-img img{width:100%;height:100%;object-fit:cover}
@@ -440,7 +451,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v32 · 03/10';
+const APP_VER = 'v33 · 04/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -1486,13 +1497,24 @@ async function renderSetDetail(setId){
   el.querySelector('#backBtn').onclick=()=>{ location.hash='sets'; };
   let set; try{ const r=await fetch('https://api.tcgdex.net/v2/en/sets/'+setId); set=await r.json(); }catch(e){ el.querySelector('.loader').outerHTML='<div class="errbox">Sem ligação.</div>'; return; }
   const cards=set.cards||[]; const total=(set.cardCount&&set.cardCount.official)||cards.length;
+  let setFilter='all';
   const paint=()=>{
-    let n=0,val=0; cards.forEach(c=>{ cardLots(c.id).forEach(l=>{ n+=l.qty||1; val+=cardTotalValue(l); }); });
+    let n=0,val=0,have=0; cards.forEach(c=>{ const lots=cardLots(c.id); if(lots.length) have++; lots.forEach(l=>{ n+=l.qty||1; val+=cardTotalValue(l); }); });
+    const miss=cards.length-have;
+    const shown = setFilter==='owned' ? cards.filter(c=>cardLots(c.id).length)
+                : setFilter==='missing' ? cards.filter(c=>!cardLots(c.id).length)
+                : cards;
     el.innerHTML=`<div class="dtop"><button class="back" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="dtitle"><div class="num tnum">${SETCODES[setId]?SETCODES[setId]+' · ':''}${total} cartas</div><h1>${set.name}</h1></div></div>
-      <div class="setmeta"><b>${n}</b>/${total} cartas · <b>${fmtEur(val)}</b></div>
-      <div class="cgrid">${cards.map(c=>setCardHTML(c,set)).join('')}</div>`;
+      <div class="setmeta"><b>${have}</b>/${total} cartas · <b>${fmtEur(val)}</b></div>
+      <div class="chips setfilter">
+        <button class="chip ${setFilter==='all'?'on':''}" data-sf="all">Todas (${cards.length})</button>
+        <button class="chip ${setFilter==='owned'?'on':''}" data-sf="owned">Que tenho (${have})</button>
+        <button class="chip ${setFilter==='missing'?'on':''}" data-sf="missing">Faltam (${miss})</button>
+      </div>
+      <div class="cgrid">${shown.length?shown.map(c=>setCardHTML(c,set)).join(''):'<div class="errbox" style="grid-column:1/-1">Nenhuma carta aqui.</div>'}</div>`;
     el.querySelector('#backBtn').onclick=()=>{ location.hash='sets'; };
+    el.querySelectorAll('[data-sf]').forEach(b=> b.onclick=()=>{ setFilter=b.dataset.sf; paint(); window.scrollTo(0,0); });
     el.querySelectorAll('[data-c]').forEach(b=> b.onclick=()=>{ const c=cards.find(x=>x.id===b.dataset.c);
       openCardEditor({id:c.id,name:c.name,image:c.image,localId:c.localId,set:{name:set.name,cardCount:set.cardCount},rarity:c.rarity,lang:'en'}, paint); });
   };
@@ -1592,6 +1614,8 @@ function paintWallet(){
   const pv=pokedexValue();
   body.innerHTML=`<div class="seclabel">Coleção Pokédex</div>
     <div class="wsetlist" style="margin-bottom:2px"><div class="wsetrow" style="background:var(--accent-soft)"><span class="wsr-n">📕 1 carta por Pokémon</span><span class="wsr-c tnum">${pv.count}</span><span class="wsr-v tnum">${fmtEur(pv.value)}</span></div></div>
+    <div class="seclabel">Valorizar a Pokédex 💎</div>
+    <div id="upgBox"></div>
     <div class="seclabel">Valor por coleção</div>
     <div class="wsetlist">${setsArr.slice(0,12).map(([sid,s])=>`<div class="wsetrow"><span class="wsr-n">${s.name}</span><span class="wsr-c tnum">${s.n}</span><span class="wsr-v tnum">${fmtEur(s.val)}</span></div>`).join('')}</div>
     <div class="seclabel">Cartas mais valiosas</div>
@@ -1599,6 +1623,74 @@ function paintWallet(){
       <div class="wt-m"><b>${c.name}</b><span>${c.setName||''} ${c.no?('· '+c.no):''}${c.variant&&c.variant!=='normal'?(' · '+VARIANT_LABEL[c.variant]):''}${c.grade&&c.grade!=='raw'?(' · '+c.grade):''}</span></div>
       <div class="wt-v tnum">${fmtEur(cardTotalValue(c))}${(c.qty||1)>1?('<small>'+c.qty+'×</small>'):(u&&u.manual?'<small>manual</small>':'')}</div></div>`; }).join('')}</div>
     <p class="wnote">Preços raw do Cardmarket (via TCGdex). Avaliadas usam o valor que meteste. Movimento = média 7/30 dias vs. agora.</p>`;
+  wireUpgrades();
+}
+
+/* ======== Localizador de valorizações: cartas que valem mais do que as que tens ======== */
+let _upgCache=null, _upgRunning=false;
+function regForm(sid){ const m=sid.match(/^d(\d+)(?::([a-z]+))?$/); return m?{n:+m[1],form:m[2]||'base'}:null; }
+async function findUpgrades(onProgress){
+  const slots=[]; for(const sid in collection){ const r=collection[sid]; if(r&&r.cardId){ const f=regForm(sid); if(f) slots.push({sid,...f}); } }
+  const total=slots.length;
+  // 1) listas de cartas por Pokémon (cache 14d em IndexedDB)
+  const slotCards={}; let d1=0;
+  await pool(slots, async s=>{ try{ const all=await fetchDexCards(s.n); slotCards[s.sid]=all.filter(c=>detectForm(c.name)===s.form); }catch(e){ slotCards[s.sid]=[]; } d1++; onProgress&&onProgress('listas',d1,total); }, 6);
+  // 2) preços em falta (cache em IndexedDB via fetchDetail)
+  const byId={}; const needIds=new Set();
+  for(const s of slots) (slotCards[s.sid]||[]).forEach(c=>{ byId[c.id]=c; if(priceMap[c.id]===undefined) needIds.add(c.id); });
+  const need=[...needIds]; let d2=0;
+  await pool(need, async id=>{ try{ const dd=await fetchDetail(byId[id]); priceMap[id]=(dd&&dd.price)||{value:null}; }catch(e){ priceMap[id]={value:null}; } d2++; onProgress&&onProgress('preços',d2,need.length); }, 8);
+  // 3) para cada Pokémon registado, cartas que valem mais do que a melhor que tens
+  const out=[];
+  for(const s of slots){
+    const myVal = Math.max(0, ...ownedLotsForSlot(s.n,s.form).map(l=>(cardUnitValue(l)||{}).value||0));
+    const cand = (slotCards[s.sid]||[]).map(c=>({c, v:(priceMap[c.id]&&priceMap[c.id].value)||0}))
+      .filter(x=>x.v > myVal+0.2).sort((a,b)=>b.v-a.v);
+    if(cand.length){ const best=cand[0]; const mon=NATIONAL.find(m=>m.n===s.n);
+      out.push({ n:s.n, form:s.form, mon:(mon?mon.name:('#'+s.n)), myVal,
+        bestName:best.c.name, bestSet:(best.c.set&&best.c.set.name)||'', bestVal:best.v, bestImg:best.c.image||null,
+        more:cand.length-1, gain:+(best.v-myVal).toFixed(2) }); }
+  }
+  out.sort((a,b)=>b.gain-a.gain);
+  _upgCache={ts:Date.now(), list:out}; idbSet('upgrades2', _upgCache);
+  return out;
+}
+async function wireUpgrades(){
+  const box=document.getElementById('upgBox'); if(!box) return;
+  if(!_upgCache){ _upgCache = await idbGet('upgrades2') || null; }
+  if(_upgRunning){ return; }
+  if(_upgCache && _upgCache.list){ paintUpgrades(_upgCache); return; }
+  box.innerHTML=`<button class="btn gold" id="upgRun" style="width:100%;justify-content:center">🔎 Procurar cartas que valorizam</button>
+    <p class="wnote">Compara a carta que tens em cada Pokémon com todas as que existem e mostra as que valem mais (pode demorar à 1ª vez).</p>`;
+  const b=document.getElementById('upgRun'); if(b) b.onclick=runUpgrades;
+}
+async function runUpgrades(){
+  const box=document.getElementById('upgBox'); if(!box || _upgRunning) return;
+  _upgRunning=true;
+  box.innerHTML=`<div class="wprog" id="upgProg">a preparar…</div>`;
+  const pr=document.getElementById('upgProg');
+  try{
+    await findUpgrades((phase,d,t)=>{ if(pr) pr.textContent=`a analisar (${phase}) ${d}/${t}…`; });
+    paintUpgrades(_upgCache);
+  }catch(e){ if(pr) pr.textContent='Não consegui analisar (sem ligação?).'; }
+  _upgRunning=false;
+}
+function paintUpgrades(cache){
+  const box=document.getElementById('upgBox'); if(!box) return;
+  const list=(cache&&cache.list)||[];
+  const when=cache&&cache.ts?new Date(cache.ts).toLocaleDateString('pt-PT'):'';
+  if(!list.length){ box.innerHTML=`<div class="wnote">✅ Em cada Pokémon registado, já tens a carta mais valiosa que existe (ou sem dados de preço). <button class="btn sm" id="upgRun" style="margin-left:6px">Analisar de novo</button></div>`;
+    const b=document.getElementById('upgRun'); if(b) b.onclick=runUpgrades; return; }
+  const rows=list.slice(0,40).map(u=>`<button class="upgrow" data-n="${u.n}" data-form="${u.form}">
+    <div class="ur-img"><img loading="lazy" src="${u.bestImg?cardImg(u.bestImg,'low'):PLACEHOLDER}" onerror="this.src='${PLACEHOLDER}'"></div>
+    <div class="ur-m"><b>${u.mon}${u.form!=='base'?' · '+(FORM_LABEL[u.form]||u.form):''}</b>
+      <span>Tens ${fmtEur(u.myVal)} → <b>${u.bestName}</b> ${fmtEur(u.bestVal)}</span>
+      <span class="ur-set">${u.bestSet}${u.more?(' · +'+u.more+' opç'+(u.more>1?'ões':'ão')):''}</span></div>
+    <div class="ur-g">+${fmtEur(u.gain)}</div></button>`).join('');
+  box.innerHTML=`<div class="upglist">${rows}</div>
+    <div class="wnote">${list.length} Pokémon com cartas mais valiosas${list.length>40?' (mostro os 40 maiores)':''} · ${when} <button class="btn sm" id="upgRun" style="margin-left:6px">↻</button></div>`;
+  box.querySelectorAll('.upgrow').forEach(b=> b.onclick=()=>{ const n=b.dataset.n, f=b.dataset.form; location.hash='p'+n+(f&&f!=='base'?'-'+f:''); });
+  const rb=document.getElementById('upgRun'); if(rb) rb.onclick=runUpgrades;
 }
 
 /* ============================ Sincronização (Firebase) ============================ */
