@@ -452,7 +452,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v34 · 04/10';
+const APP_VER = 'v35 · 04/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -534,17 +534,39 @@ function syncRepsForMon(mon){   // representativo da grelha = melhor carta que t
    — ex. uma carta do Swellow (#277) acabava no slot do Chingling (#433). Isto repara automaticamente:
    (1) confirma o dexId verdadeiro de cada carta na TCGdex (uma vez, fica em cache com dexOk)
    (2) reconstrói TODOS os representativos da grelha a partir do owned (fonte da verdade). */
+// Descobrir o nº nacional a partir do NOME da carta (fallback quando a API não dá dexId — ex. sets JP).
+// Ex.: "Galarian Meowth" → tira a forma → "Meowth" → #52.  "Charizard GX" → "Charizard".
+function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9♀♂]/g,''); }
+let _nameMap=null;
+function nameMap(){ if(_nameMap) return _nameMap; _nameMap={}; for(const m of NATIONAL){ _nameMap[normName(m.name)]=m.n; } return _nameMap; }
+function guessDexFromName(name){
+  if(!name || !NATIONAL || !NATIONAL.length) return null;
+  const map=nameMap();
+  let s=name.replace(/^(Alolan|Galarian|Hisuian|Paldean|Mega|M)\s+/i,'');   // prefixo de forma
+  s=s.replace(/^.*?['’]s\s+/,'');   // dono (Team Rocket's / Giovanni's …) — "Farfetch'd" tem 'd, não é apanhado
+  const parts=s.split(/\s+/).filter(Boolean);
+  for(let i=parts.length;i>=1;i--){ const c=normName(parts.slice(0,i).join('')); if(map[c]!=null) return map[c]; }   // tira do fim os sufixos (GX, δ, V…)
+  return null;
+}
 async function healDexIds(){
-  const need=[]; for(const k in owned){ if(!owned[k].dexOk) need.push(k); }
+  // re-processa cartas por verificar, E qualquer carta que esteja sem Pokémon (dexId vazio), mesmo que já tenha dexOk
+  const need=[]; for(const k in owned){ const c=owned[k]; if(!c.dexOk || !(c.dexId&&c.dexId.length)) need.push(k); }
   if(!need.length) return false;
   let changed=false;
   await pool(need, async k=>{ const c=owned[k]; if(!c) return;
+    if(!(c.dexId&&c.dexId.length)){   // sem Pokémon → tenta pelo nome primeiro (sem rede)
+      const g=guessDexFromName(c.name);
+      if(g!=null){ c.dexId=[g]; c.dexOk=true; changed=true; return; }
+    }
     const full=await fetchCardFull(c.id);
-    if(full && Array.isArray(full.dexId) && full.dexId.length){   // só confiamos quando a API dá um dexId real
+    if(full && Array.isArray(full.dexId) && full.dexId.length){   // a API dá um dexId real → é o que manda
       const nd=full.dexId.map(Number);
       if(JSON.stringify(nd)!==JSON.stringify((c.dexId||[]).map(Number))){ c.dexId=nd; changed=true; }
       c.dexOk=true;   // verificado — não volta a procurar
-    }   // API sem dexId (ex. alguns sets JP) → não congela um valor possivelmente errado; corrige-se ao re-adicionar
+    } else if(!(c.dexId&&c.dexId.length)){   // API também sem dexId → último recurso: nome
+      const g=guessDexFromName(c.name);
+      if(g!=null){ c.dexId=[g]; c.dexOk=true; changed=true; }
+    }
   }, 6);
   saveOwned(); if(changed) rebuildOwnedIndex();
   return changed;
@@ -1626,58 +1648,75 @@ function paintWallet(){
 }
 
 /* ======== Localizador de valorizações: cartas que valem mais do que as que tens ======== */
-let _upgCache=null, _upgRunning=false;
+let _upgCache=null, _upgRunning=false; const UPG_TTL=7*DAY;
 function regForm(sid){ const m=sid.match(/^d(\d+)(?::([a-z]+))?$/); return m?{n:+m[1],form:m[2]||'base'}:null; }
-async function findUpgrades(onProgress){
+// Processa Pokémon a Pokémon e emite cada valorização via onResult à medida que a encontra (streaming).
+async function findUpgrades(onResult, onProgress){
   const slots=[]; for(const sid in collection){ const r=collection[sid]; if(r&&r.cardId){ const f=regForm(sid); if(f) slots.push({sid,...f}); } }
-  const total=slots.length;
-  // 1) listas de cartas por Pokémon (cache 14d em IndexedDB)
-  const slotCards={}; let d1=0;
-  await pool(slots, async s=>{ try{ const all=await fetchDexCards(s.n); slotCards[s.sid]=all.filter(c=>detectForm(c.name)===s.form); }catch(e){ slotCards[s.sid]=[]; } d1++; onProgress&&onProgress('listas',d1,total); }, 6);
-  // 2) preços em falta (cache em IndexedDB via fetchDetail)
-  const byId={}; const needIds=new Set();
-  for(const s of slots) (slotCards[s.sid]||[]).forEach(c=>{ byId[c.id]=c; if(priceMap[c.id]===undefined) needIds.add(c.id); });
-  const need=[...needIds]; let d2=0;
-  await pool(need, async id=>{ try{ const dd=await fetchDetail(byId[id]); priceMap[id]=(dd&&dd.price)||{value:null}; }catch(e){ priceMap[id]={value:null}; } d2++; onProgress&&onProgress('preços',d2,need.length); }, 8);
-  // 3) para cada Pokémon registado, cartas que valem mais do que a melhor que tens
-  const out=[];
-  for(const s of slots){
-    const myVal = Math.max(0, ...ownedLotsForSlot(s.n,s.form).map(l=>(cardUnitValue(l)||{}).value||0));
-    const cand = (slotCards[s.sid]||[]).map(c=>({c, v:(priceMap[c.id]&&priceMap[c.id].value)||0}))
-      .filter(x=>x.v > myVal+0.2).sort((a,b)=>b.v-a.v);
-    if(cand.length){ const best=cand[0]; const mon=NATIONAL.find(m=>m.n===s.n);
-      out.push({ n:s.n, form:s.form, mon:(mon?mon.name:('#'+s.n)), myVal,
-        bestName:best.c.name, bestSet:(best.c.set&&best.c.set.name)||'', bestVal:best.v, bestImg:best.c.image||null,
-        more:cand.length-1, gain:+(best.v-myVal).toFixed(2) }); }
-  }
+  const total=slots.length; let done=0; const out=[];
+  await pool(slots, async s=>{
+    try{
+      const myVal = Math.max(0, ...ownedLotsForSlot(s.n,s.form).map(l=>(cardUnitValue(l)||{}).value||0));
+      const all = await fetchDexCards(s.n);
+      const cards = all.filter(c=>detectForm(c.name)===s.form);
+      await pool(cards, async c=>{ if(priceMap[c.id]===undefined){ try{ const dd=await fetchDetail(c); priceMap[c.id]=(dd&&dd.price)||{value:null}; }catch(e){ priceMap[c.id]={value:null}; } } }, 6);
+      const cand = cards.map(c=>({c, v:(priceMap[c.id]&&priceMap[c.id].value)||0})).filter(x=>x.v > myVal+0.2).sort((a,b)=>b.v-a.v);
+      if(cand.length){ const best=cand[0]; const mon=NATIONAL.find(m=>m.n===s.n);
+        const u={ n:s.n, form:s.form, mon:(mon?mon.name:('#'+s.n)), myVal,
+          bestName:best.c.name, bestSet:(best.c.set&&best.c.set.name)||'', bestVal:best.v, bestImg:best.c.image||null,
+          more:cand.length-1, gain:+(best.v-myVal).toFixed(2) };
+        out.push(u); onResult&&onResult(u); }
+    }catch(e){}
+    done++; onProgress&&onProgress(done,total);
+  }, 4);
   out.sort((a,b)=>b.gain-a.gain);
   _upgCache={ts:Date.now(), list:out}; idbSet('upgrades2', _upgCache);
   return out;
+}
+// aquecer em 2º plano (no arranque) para a tab estar pronta sem botão nem espera
+async function warmUpgrades(){
+  if(_upgRunning || !Object.keys(owned).length) return;
+  if(!_upgCache) _upgCache = await idbGet('upgrades2') || null;
+  if(_upgCache && (Date.now()-_upgCache.ts)<UPG_TTL) return;   // já temos resultado recente
+  _upgRunning=true;
+  try{ await findUpgrades(null, (d,t)=>{ const st=document.getElementById('upgStatus'); if(st && !document.getElementById('upgView').hidden) st.textContent=`a analisar… ${d}/${t}`; }); }
+  catch(e){}
+  _upgRunning=false;
+  if(!document.getElementById('upgView').hidden) renderUpgradesView();   // se estás na tab, mostra já
 }
 async function renderUpgradesView(){
   const el=document.getElementById('upgView'); if(!el) return;
   if(!Object.keys(owned).length){ el.innerHTML=`<div class="vhead"><h1>Valorizar</h1></div><div class="empty"><b>Ainda sem cartas</b><br>Regista cartas na Pokédex e vê aqui quais poderias trocar por mais valiosas.</div>`; return; }
   if(!_upgCache){ _upgCache = await idbGet('upgrades2') || null; }
-  el.innerHTML=`<div class="vhead"><div class="row"><h1 style="flex:1">Valorizar</h1>${(_upgCache&&_upgCache.list)?'<button class="btn sm" id="upgRe">↻ Reanalisar</button>':''}</div>
-    <p class="vsub">Pokémon onde existe uma carta que vale mais do que a tua — tocar abre o Pokémon.</p></div>
-    <div id="upgMain"></div>`;
-  const re=document.getElementById('upgRe'); if(re) re.onclick=runUpgrades;
-  const m=document.getElementById('upgMain');
-  if(_upgRunning){ m.innerHTML=`<div class="wprog" id="upgProg">a analisar…</div>`; return; }
-  if(_upgCache && _upgCache.list){ paintUpgradesGrid(_upgCache); return; }
-  m.innerHTML=`<button class="btn gold" id="upgRun" style="width:100%;justify-content:center;margin-top:6px">🔎 Procurar valorizações</button>
-    <p class="wnote">Compara a carta que tens em cada Pokémon com todas as que existem. À 1ª vez pode demorar (vai buscar preços); fica guardado para a próxima.</p>`;
-  const b=document.getElementById('upgRun'); if(b) b.onclick=runUpgrades;
+  const stale = !_upgCache || (Date.now()-_upgCache.ts)>=UPG_TTL;
+  el.innerHTML=`<div class="vhead"><div class="row"><h1 style="flex:1">Valorizar</h1><button class="btn sm" id="upgRe">↻</button></div>
+    <p class="vsub">Pokémon onde existe uma carta que vale mais do que a tua — toca para abrir.</p></div>
+    <div id="upgStatus" class="wprog"></div><div id="upgMain"></div>`;
+  document.getElementById('upgRe').onclick=()=>runUpgrades();
+  // delegação: tocar num tile abre o Pokémon (funciona mesmo com tiles a aparecer em streaming)
+  document.getElementById('upgMain').addEventListener('click', e=>{ const t=e.target.closest('.upgtile'); if(!t) return; const n=t.dataset.n,f=t.dataset.form; location.hash='p'+n+(f&&f!=='base'?'-'+f:''); });
+  if(_upgCache && _upgCache.list && _upgCache.list.length) paintUpgradesGrid(_upgCache);
+  else if(_upgCache && _upgCache.list) document.getElementById('upgMain').innerHTML=`<div class="empty"><b>Tudo no topo 🎉</b><br>Em cada Pokémon registado já tens a carta mais valiosa que existe (ou sem dados de preço).</div>`;
+  if(_upgRunning) document.getElementById('upgStatus').textContent='a analisar…';
+  else if(stale) runUpgrades();   // carrega/atualiza sozinho — sem botão, sem espera
 }
 async function runUpgrades(){
-  const m=document.getElementById('upgMain'); if(!m || _upgRunning) return;
+  const main=document.getElementById('upgMain'); if(!main || _upgRunning) return;
   _upgRunning=true;
-  m.innerHTML=`<div class="wprog" id="upgProg">a preparar…</div>`;
-  const pr=document.getElementById('upgProg');
+  const status=document.getElementById('upgStatus');
+  const showing = _upgCache && _upgCache.list && _upgCache.list.length;
+  if(!showing){ main.innerHTML=`<div class="upggrid" id="upgGridLive"></div>`; }   // streaming: tiles aparecem aqui
+  if(status) status.textContent='a analisar… (à 1ª vez pode demorar)';
+  const live=document.getElementById('upgGridLive');
   try{
-    await findUpgrades((phase,d,t)=>{ if(pr) pr.textContent=`a analisar (${phase}) ${d}/${t}…`; });
-    _upgRunning=false; renderUpgradesView();
-  }catch(e){ _upgRunning=false; if(pr) pr.textContent='Não consegui analisar (sem ligação?).'; }
+    await findUpgrades(
+      u=>{ if(live) live.insertAdjacentHTML('beforeend', upgTile(u)); },
+      (d,t)=>{ if(status) status.textContent=`a analisar… ${d}/${t}`; }
+    );
+    _upgRunning=false;
+    if(status) status.textContent='';
+    paintUpgradesGrid(_upgCache);
+  }catch(e){ _upgRunning=false; if(status) status.textContent='Não consegui analisar (sem ligação?).'; }
 }
 function paintUpgradesGrid(cache){
   const m=document.getElementById('upgMain'); if(!m) return;
@@ -1685,8 +1724,7 @@ function paintUpgradesGrid(cache){
   const when=cache&&cache.ts?new Date(cache.ts).toLocaleDateString('pt-PT'):'';
   if(!list.length){ m.innerHTML=`<div class="empty"><b>Tudo no topo 🎉</b><br>Em cada Pokémon registado já tens a carta mais valiosa que existe (ou sem dados de preço).</div>`; return; }
   m.innerHTML=`<div class="upggrid">${list.map(upgTile).join('')}</div>
-    <p class="wnote">${list.length} Pokémon com cartas mais valiosas · analisado ${when}</p>`;
-  m.querySelectorAll('.upgtile').forEach(b=> b.onclick=()=>{ const n=b.dataset.n,f=b.dataset.form; location.hash='p'+n+(f&&f!=='base'?'-'+f:''); });
+    <p class="wnote">${list.length} Pokémon com cartas mais valiosas · ${when}</p>`;
 }
 function upgTile(u){
   return `<button class="upgtile" data-n="${u.n}" data-form="${u.form}">
@@ -1807,7 +1845,8 @@ async function boot(){
     refreshOwnedPrices().then(n=>{ if(n>0){
       if(!document.getElementById('homeView').hidden) renderGrid(); else renderProgress();
       if(!document.getElementById('walletView').hidden && document.getElementById('wBody')){ const wt=document.getElementById('wTotal'); if(wt) wt.textContent=fmtEur(walletTotal()); paintWallet(); } }
-    }).catch(()=>{});
+    }).catch(()=>{})
+    .then(()=>warmUpgrades());   // aquece as valorizações em 2º plano (pronto quando abrires a tab)
   }
   if('serviceWorker' in navigator){
     // atualização SUAVE: ativa a nova versão em segundo plano; aplica-se na próxima abertura (sem recarregar a meio → sem loops/ecrã preto)
