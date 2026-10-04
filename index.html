@@ -452,7 +452,7 @@ main{padding-bottom:68px}
 <script>
 "use strict";
 /* ============================ config & data ============================ */
-const APP_VER = 'v35 · 04/10';
+const APP_VER = 'v36 · 04/10';
 const GQL = 'https://api.tcgdex.net/v2/graphql';
 const REST = 'https://api.tcgdex.net/v2/en/cards/';
 const ARTWORK = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${n}.png`;
@@ -752,13 +752,15 @@ function detectForm(name){
 }
 
 /* ============================ progress ============================ */
+const MON_FORMS=['mega','alola','galar','hisui','paldea','other'];
+// Tenho este Pokémon em ALGUMA forma? (base, regional, mega…) — qualquer forma conta p/ a entrada da Pokédex
+function monHas(n){ if(collection['d'+n]) return true; for(const f of MON_FORMS) if(collection['d'+n+':'+f]) return true; return false; }
+function ownedFormsLabel(n){ const out=[]; for(const f of MON_FORMS) if(collection['d'+n+':'+f]) out.push(FORM_LABEL[f]||f); return out.join(' · '); }
 function progress(){
-  let base=0, reg=0, other=0;
-  for(const k in collection){
-    if(/^d\d+$/.test(k)) base++;
-    else{ const f=k.split(':')[1]; if(REGION_LABEL[f]) reg++; else other++; }
-  }
-  return {base, reg, other};
+  const dex=new Set(); let reg=0, other=0;   // base = nº de Pokémon que tens em qualquer forma
+  for(const k in collection){ const m=k.match(/^d(\d+)(?::([a-z]+))?$/); if(!m) continue;
+    dex.add(m[1]); const f=m[2]; if(f){ if(REGION_LABEL[f]) reg++; else other++; } }
+  return {base:dex.size, reg, other};
 }
 function pokedexValue(){   // valor das cartas representativas da Pokédex (1 por slot)
   let t=0,n=0;
@@ -778,7 +780,7 @@ function renderProgress(){
 /* ============================ grid ============================ */
 let searchTerm='';
 function slotVisible(mon, region){
-  const owned = !!collection[slotId(mon.n, region)];
+  const owned = region ? !!collection[slotId(mon.n, region)] : monHas(mon.n);   // tile principal: qualquer forma conta
   const f=settings.filter;
   if(f==='regional' && !region) return false;      // "Regionais" mostra só formas regionais
   if(f==='owned' && !owned) return false;
@@ -804,16 +806,19 @@ function ownedValueByCard(){ const m={}; for(const k in owned){ const c=owned[k]
 function tileHTML(slot){
   const {mon,region,artId}=slot;
   const own=collection[slotId(mon.n,region)];
-  const owned=!!own;
+  // o tile principal fica "registado" se tiveres o Pokémon em QUALQUER forma (base, regional, mega…)
+  const otherForm = !region && !own && monHas(mon.n);
+  const owned=!!own || otherForm;
   const name=region?`${REGION_LABEL[region]} ${mon.name}`:mon.name;
   const useCard=settings.listImage==='card' && own && own.image;
   const img=useCard?cardImg(own.image,'low'):ARTWORK(region?artId:mon.n);
   const df=region?` data-form="${region}"`:'';
   let sub='';
-  if(owned){
+  if(own){
     if(own.cardId){ const v=_gridValMap[own.cardId]; const vtxt=(v!=null)?fmtEur(v):(own.price?fmtPrice(own.price):''); sub=`<div class="ownedcard"><span class="oc-nm">🃏 ${own.setName||''}</span>${vtxt?('<b class="oc-v">'+vtxt+'</b>'):''}</div>`; }
     else sub=`<div class="nocardtag">✔ tenho · sem carta</div>`;
-  } else sub=`<div class="nocardtag"></div>`;
+  } else if(otherForm){ sub=`<div class="nocardtag">✔ tens · ${ownedFormsLabel(mon.n)||'outra forma'}</div>`; }
+  else sub=`<div class="nocardtag"></div>`;
   return `<article class="tile ${owned?'owned':''} ${useCard?'card-mode':''} ${region?'reg-tile':''}" data-n="${mon.n}"${df}>
     <div class="rbadges">${region?`<span class="rbadge reg">${REGION_LABEL[region]}</span>`:(REGIONAL[mon.n]?`<span class="rbadge soft">+ regional</span>`:'')}</div>
     <button class="check" data-check="${mon.n}"${df} aria-label="${owned?'Tenho':'Marcar'}">
